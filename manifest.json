@@ -1,0 +1,13 @@
+{
+  "files": [
+    {
+      "name": "gleif-london.jsonl",
+      "size": 45162274,
+      "sha256": "46d2f256f5c4c3c0aa5f7d0b01b90b9eb139bd4b97251e6d1ebf6ad99890cf55",
+      "tag": "v0.1.0",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/v0.1.0/gleif-london.jsonl",
+      "oci": "ghcr.io/docktermj/senzing-cord-development-test:v0.1.0",
+      "source": "https://senzing.com/datasets/gleif-london.jsonl"
+    }
+  ]
+}
