@@ -108,10 +108,12 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 - **URL:** no. A blob is fetched from
   `https://ghcr.io/v2/<owner>/<name>/blobs/sha256:<sha256>`, but only with a bearer token,
   which first has to be requested from `https://ghcr.io/token`. That's two requests, not one
-  URL. The token request is anonymous only for a public package. For a package that doesn't
-  exist or isn't public, it returns HTTP 403:
-  `{"errors":[{"code":"DENIED","message":"requested access to the resource is denied"}]}`.
-  This was checked on 2026-10-27.
+  URL. The token request is anonymous only for a public package. Checked on 2026-10-27, it
+  returns:
+  - HTTP 403 `{"errors":[{"code":"DENIED","message":"requested access to the resource is denied"}]}`
+    for a package that doesn't exist;
+  - HTTP 401 `{"errors":[{"code":"UNAUTHORIZED","message":"authentication required"}]}`
+    for a package that exists but is private, such as this proof of concept's.
 - **Capacity:** yes, without splitting. "The Container registry has a 10 GB size limit for each
   layer", and "a 10 minute timeout limit for uploads". Pushing `opendata-lasvegas.jsonl` within
   that timeout takes about 1.6 MB/s of sustained upload.
@@ -154,7 +156,7 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 | Pages does not serve Git LFS files | Rules out LFS | Not used | Not used | Not used | Not used |
 | Release asset limited to 2 GiB | Not used | Not used | Largest file is 0.98 GB | Not used | Largest rejoined file is 0.98 GB |
 | `ghcr.io` layer limited to 10 GB; uploads time out after 10 minutes | Not used | Not used | Not used | Largest file is 0.98 GB | Not used |
-| Anonymous `ghcr.io` pull needs a token; 403 `DENIED` if the package is not public | Not used | Not used | Not used | Must be public for anonymous automation | Not used |
+| Anonymous `ghcr.io` pull needs a token; 403 `DENIED` if the package doesn't exist, 401 `UNAUTHORIZED` if it is private | Not used | Not used | Not used | Must be public for anonymous automation | Not used |
 | New package is private; public cannot become private again | Not used | Not used | Not used | Starts private; going public is a one-way decision | Not used |
 | Every revision adds a full copy to history | Yes | Yes | No | No | Yes |
 | Size-cut shards shift on insertion | No shards | No shards | No shards | No shards | About 1 GB per small early edit |
@@ -243,8 +245,11 @@ oras blob fetch --output - ghcr.io/docktermj/senzing-cord-development-test@sha25
 | Copy | SHA-256 matches | Checked |
 | --- | --- | --- |
 | `https://senzing.com/datasets/gleif-london.jsonl` | Yes | 2026-10-27 |
-| Release asset `v0.1.0` | Pending publication | |
-| `ghcr.io` blob | Pending publication | |
+| Release asset `v0.1.0` | Yes | 2026-10-27 |
+| `ghcr.io` blob | Yes | 2026-10-27 |
+
+The `ghcr.io` package `senzing-cord-development-test` is linked to this repository and is
+private. Making it public is a separate, one-way decision.
 
 ## Later improvements
 
