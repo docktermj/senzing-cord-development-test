@@ -26,17 +26,26 @@ changing anything about storage. In short:
   `size`, `sha256`, `tag`, `url`, `oci` (the per-file repository) and an optional `source`.
   `tag` and `url` are `null` until the file is released. A data change is a PR that edits
   it.
-- **Versions are semver tags.** The proof of concept is `v0.1.0`, which holds only
-  `gleif-london.jsonl`.
+- **Versions are bare SemVer tags** (`0.2.0`), each a Release holding every file in the
+  manifest. The proof of concept, `v0.1.0`, is the only tag with a leading `v`, and counts
+  as `0.1.0`.
 
 ## Commands
 
 `/upload-jsonl` (`.claude/skills/upload-jsonl/`) pushes new and changed `jsonl/*.jsonl` files
 and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
-nothing. Its tests:
+nothing. `/release-jsonl` (`.claude/skills/release-jsonl/`) then publishes them:
+
+- it asks for the SemVer bump;
+- it builds a draft Release and a `release-<version>` PR;
+- it asks before merging;
+- it then tags `ghcr.io` and publishes the draft on the merge commit.
+
+`release_jsonl.py` imports its CHANGELOG parsing from `upload_jsonl.py`. Tests for both:
 
 ```bash
 python3 -m unittest discover -s .claude/skills/upload-jsonl -p 'test_*.py'
+python3 -m unittest discover -s .claude/skills/release-jsonl -p 'test_*.py'
 ```
 
 The document's "Proof of concept" section has the full publish and download commands for
