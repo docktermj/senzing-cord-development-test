@@ -41,11 +41,18 @@ nothing. `/release-jsonl` (`.claude/skills/release-jsonl/`) then publishes them:
 - it asks before merging;
 - it then tags `ghcr.io` and publishes the draft on the merge commit.
 
-`release_jsonl.py` imports its CHANGELOG parsing from `upload_jsonl.py`. Tests for both:
+`/download-jsonl` (`.claude/skills/download-jsonl/`) fills `jsonl/` from the manifest:
+
+- released files come from their Release URL, and unreleased ones from `ghcr.io`;
+- each file's SHA-256 is checked;
+- a locally modified file is kept unless named with `--force <name>`.
+
+`release_jsonl.py` and `download_jsonl.py` import shared helpers from `upload_jsonl.py`. Tests:
 
 ```bash
-python3 -m unittest discover -s .claude/skills/upload-jsonl -p 'test_*.py'
-python3 -m unittest discover -s .claude/skills/release-jsonl -p 'test_*.py'
+for s in upload release download; do
+  python3 -m unittest discover -s .claude/skills/$s-jsonl -p 'test_*.py'
+done
 ```
 
 The document's "Proof of concept" section has the full publish and download commands for
