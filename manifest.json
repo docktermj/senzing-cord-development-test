@@ -4,10 +4,18 @@
       "name": "gleif-london.jsonl",
       "size": 45162274,
       "sha256": "46d2f256f5c4c3c0aa5f7d0b01b90b9eb139bd4b97251e6d1ebf6ad99890cf55",
-      "tag": "v0.1.0",
-      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/v0.1.0/gleif-london.jsonl",
+      "tag": "0.1.1",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/gleif-london.jsonl",
       "oci": "ghcr.io/docktermj/senzing-cord-development-test/gleif-london.jsonl",
       "source": "https://senzing.com/datasets/gleif-london.jsonl"
+    },
+    {
+      "name": "ofac-london.jsonl",
+      "size": 102967,
+      "sha256": "2299bcaf6b9111fed771b3c54a56685f5239f75c57c47d322020f742c21eb40b",
+      "tag": "0.1.1",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl",
+      "oci": "ghcr.io/docktermj/senzing-cord-development-test/ofac-london.jsonl"
     }
   ]
 }
