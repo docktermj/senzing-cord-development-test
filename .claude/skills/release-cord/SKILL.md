@@ -30,7 +30,7 @@ answer: the SemVer bump, and whether to merge.
      - A missing `sha256` tag means rerunning `/upload-senzing-ready` with the file in
        `senzing-ready/`.
      - "region … has no README heading" means adding the region to `REGIONS` in
-       `release_cord.py`; "expected <source>-<region>.jsonl" means renaming the file.
+       `upload_senzing_ready.py`; "expected <source>-<region>.jsonl" means renaming the file.
      - "needs openpyxl" means running `pip install openpyxl`, or `pip install .` from the
        repository root.
    - **`draft: <version> (resume)`:** say so, skip the bump question, and go to the step that
@@ -90,7 +90,7 @@ answer: the SemVer bump, and whether to merge.
   `url` `https://github.com/<owner>/<repo>/releases/download/<version>/<name>`. Unchanged
   entries keep the `tag` and `url` of the Release where they last changed.
 - **`README.md`:** the file lists under `## CORDs` are rewritten from `manifest.json`. There
-  is one `###` section per entry of `REGIONS` in `release_cord.py`, in alphabetical order.
+  is one `###` section per entry of `REGIONS` in `upload_senzing_ready.py`, in alphabetical order.
   Each file sits under the region after the last hyphen in its name, sorted, and links to its
   `url`. A region with no files shows "Not published yet." The text before the first `###`
   and everything outside `## CORDs` is kept.

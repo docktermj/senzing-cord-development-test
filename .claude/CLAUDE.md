@@ -63,8 +63,9 @@ done
 python3 -m unittest discover -s bin -p 'test_*.py'   # skipped without openpyxl
 ```
 
-File names must be `<source>-<region>.jsonl`; `REGIONS` in `release_cord.py` maps each region
-to its README heading. The only Python dependency, `openpyxl`, is in `pyproject.toml`
+File names must be `<source>-<region>.jsonl`; `REGIONS` in `upload_senzing_ready.py` maps each
+region to its README heading. `/upload-senzing-ready` refuses other names, and `/release-cord`
+applies the same check. The only Python dependency, `openpyxl`, is in `pyproject.toml`
 (`pip install .`).
 
 The document's "Proof of concept" section has the full publish and download commands for

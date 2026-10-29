@@ -498,7 +498,8 @@ class ReleaseTest(unittest.TestCase):
         self.seed_registry("c-paris.jsonl", FILE_B)
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
-        self.assertIn("region 'paris' has no README heading; add it to REGIONS", output)
+        self.assertIn("region 'paris' has no README heading; add it to REGIONS in "
+                      "upload_senzing_ready.py", output)
         self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
 
     def test_prepare_stops_on_name_without_region(self):
