@@ -1,7 +1,7 @@
-"""Tests for upload_jsonl.py, run against fake oras and gh executables.
+"""Tests for upload_senzing_ready.py, run against fake oras and gh executables.
 
 Run with:
-  python3 -m unittest discover -s .claude/skills/upload-jsonl -p 'test_*.py'
+  python3 -m unittest discover -s .claude/skills/upload-senzing-ready -p 'test_*.py'
 """
 
 import hashlib
@@ -18,7 +18,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import upload_jsonl  # noqa: E402
+import upload_senzing_ready  # noqa: E402
 
 REGISTRY = "ghcr.io/owner/repo"
 
@@ -86,7 +86,7 @@ class UploadTest(unittest.TestCase):
         self.root = os.path.join(self.tmp, "repo")
         self.state = os.path.join(self.tmp, "registry")
         bin_dir = os.path.join(self.tmp, "bin")
-        for directory in (self.root, self.state, bin_dir, os.path.join(self.root, "jsonl")):
+        for directory in (self.root, self.state, bin_dir, os.path.join(self.root, "senzing-ready")):
             os.makedirs(directory, exist_ok=True)
         for name, body in (("oras", FAKE_ORAS), ("gh", FAKE_GH)):
             exe = os.path.join(bin_dir, name)
@@ -110,7 +110,7 @@ class UploadTest(unittest.TestCase):
     # --- helpers ---
 
     def write_jsonl(self, name, data):
-        with open(os.path.join(self.root, "jsonl", name), "wb") as file:
+        with open(os.path.join(self.root, "senzing-ready", name), "wb") as file:
             file.write(data)
 
     def write_manifest(self, *entries):
@@ -148,10 +148,17 @@ class UploadTest(unittest.TestCase):
     def run_upload(self, *args):
         out = io.StringIO()
         with mock.patch("sys.stdout", out), mock.patch("sys.stderr", out):
-            code = upload_jsonl.main(["--root", self.root, *args])
+            code = upload_senzing_ready.main(["--root", self.root, *args])
         return code, out.getvalue()
 
     # --- tests ---
+
+    def test_old_jsonl_dir_alone_stops(self):
+        os.rmdir(os.path.join(self.root, "senzing-ready"))
+        os.makedirs(os.path.join(self.root, "jsonl"))
+        code, output = self.run_upload()
+        self.assertEqual(code, 2)
+        self.assertIn("mv jsonl senzing-ready", output)
 
     def test_new_file_is_pushed_and_added(self):
         self.write_jsonl("a.jsonl", LINES_A)
@@ -262,7 +269,7 @@ class UploadTest(unittest.TestCase):
     def test_unreleased_goes_above_existing_release(self):
         with open(os.path.join(self.root, "CHANGELOG.md"), "w") as file:
             file.write(
-                upload_jsonl.CHANGELOG_HEADER
+                upload_senzing_ready.CHANGELOG_HEADER
                 + "\n## [0.1.0] - 2026-10-27\n\n### Added\n\n- `old.jsonl`\n\n"
                 "[0.1.0]: https://example.com/0.1.0\n"
             )
@@ -286,7 +293,7 @@ class UploadTest(unittest.TestCase):
 
     def test_oversized_file_is_refused(self):
         self.write_jsonl("a.jsonl", LINES_A)
-        with mock.patch.object(upload_jsonl, "MAX_SIZE", 10):
+        with mock.patch.object(upload_senzing_ready, "MAX_SIZE", 10):
             code, output = self.run_upload()
         self.assertEqual(code, 1)
         self.assertIn("over the 2 GiB limit", output)

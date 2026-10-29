@@ -1,7 +1,7 @@
-"""Tests for release_jsonl.py, run against fake gh, oras and curl executables.
+"""Tests for release_cord.py, run against fake gh, oras and curl executables.
 
 A real bare git repository stands in for origin. Run with:
-  python3 -m unittest discover -s .claude/skills/release-jsonl -p 'test_*.py'
+  python3 -m unittest discover -s .claude/skills/release-cord -p 'test_*.py'
 """
 
 import datetime
@@ -19,7 +19,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import release_jsonl  # noqa: E402
+import release_cord  # noqa: E402
 
 REGISTRY = "ghcr.io/owner/repo"
 
@@ -194,7 +194,7 @@ class ReleaseTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q", "--bare", "-b", "main", self.origin], check=True)
         subprocess.run(["git", "clone", "-q", self.origin, self.root], check=True,
                        capture_output=True)
-        self.write(".gitignore", "/jsonl\n")
+        self.write(".gitignore", "/senzing-ready\n")
         self.write_manifest([self.entry("a.jsonl", FILE_A, "v0.1.0")])
         self.git("add", ".")
         self.git("commit", "-q", "-m", "initial")
@@ -202,8 +202,8 @@ class ReleaseTest(unittest.TestCase):
         self.git("push", "-q", "origin", "main", "v0.1.0")
         self.seed_registry("a.jsonl", FILE_A)
         self.seed_registry("b.jsonl", FILE_B)
-        os.makedirs(os.path.join(self.root, "jsonl"))
-        with open(os.path.join(self.root, "jsonl", "b.jsonl"), "wb") as file:
+        os.makedirs(os.path.join(self.root, "senzing-ready"))
+        with open(os.path.join(self.root, "senzing-ready", "b.jsonl"), "wb") as file:
             file.write(FILE_B)
         self.upload_b()
 
@@ -228,10 +228,10 @@ class ReleaseTest(unittest.TestCase):
         self.write("manifest.json", json.dumps({"files": entries}, indent=2) + "\n")
 
     def upload_b(self):
-        """The working-tree state /upload-jsonl leaves after adding b.jsonl."""
+        """The working-tree state /upload-senzing-ready leaves after adding b.jsonl."""
         self.write_manifest([self.entry("a.jsonl", FILE_A, "v0.1.0"),
                              self.entry("b.jsonl", FILE_B, None)])
-        self.write("CHANGELOG.md", release_jsonl.upload.CHANGELOG_HEADER
+        self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
                    + "\n## [Unreleased]\n\n### Added\n\n- `b.jsonl`\n")
 
     def seed_registry(self, name, data):
@@ -251,7 +251,7 @@ class ReleaseTest(unittest.TestCase):
     def release(self, *args):
         out, err = io.StringIO(), io.StringIO()
         with mock.patch("sys.stdout", out), mock.patch("sys.stderr", err):
-            code = release_jsonl.main(["--root", self.root, "--repo", "Owner/Repo", *args])
+            code = release_cord.main(["--root", self.root, "--repo", "Owner/Repo", *args])
         return code, out.getvalue() + err.getvalue()
 
     def origin_file(self, ref, name):
@@ -260,33 +260,40 @@ class ReleaseTest(unittest.TestCase):
 
     # --- pure functions ---
 
+    def test_old_jsonl_dir_alone_stops(self):
+        shutil.move(os.path.join(self.root, "senzing-ready"), os.path.join(self.root, "jsonl"))
+        code, output = self.release("status")
+        self.assertEqual(code, 2)
+        self.assertIn("mv jsonl senzing-ready", output)
+        self.assertEqual(self.calls("gh"), [])
+
     def test_versions(self):
-        self.assertEqual(release_jsonl.parse_version("v0.1.0"), (0, 1, 0))
-        self.assertEqual(release_jsonl.parse_version("1.20.3"), (1, 20, 3))
-        self.assertIsNone(release_jsonl.parse_version("1.2.3-rc.1"))
-        self.assertIsNone(release_jsonl.parse_version("01.2.3"))
-        self.assertEqual(release_jsonl.bumped((0, 1, 0), "major"), (1, 0, 0))
-        self.assertEqual(release_jsonl.bumped((0, 1, 4), "minor"), (0, 2, 0))
-        self.assertEqual(release_jsonl.bumped((0, 1, 4), "patch"), (0, 1, 5))
-        self.assertEqual(release_jsonl.bumped(None, "minor"), (0, 1, 0))
+        self.assertEqual(release_cord.parse_version("v0.1.0"), (0, 1, 0))
+        self.assertEqual(release_cord.parse_version("1.20.3"), (1, 20, 3))
+        self.assertIsNone(release_cord.parse_version("1.2.3-rc.1"))
+        self.assertIsNone(release_cord.parse_version("01.2.3"))
+        self.assertEqual(release_cord.bumped((0, 1, 0), "major"), (1, 0, 0))
+        self.assertEqual(release_cord.bumped((0, 1, 4), "minor"), (0, 2, 0))
+        self.assertEqual(release_cord.bumped((0, 1, 4), "patch"), (0, 1, 5))
+        self.assertEqual(release_cord.bumped(None, "minor"), (0, 1, 0))
 
     def test_anchor_drops_brackets_and_dots(self):
-        self.assertEqual(release_jsonl.github_anchor("[0.2.0] - 2026-10-28"), "020---2026-10-28")
+        self.assertEqual(release_cord.github_anchor("[0.2.0] - 2026-10-28"), "020---2026-10-28")
 
     def test_suggest_bump(self):
-        self.assertEqual(release_jsonl.suggest_bump({"Removed": ["x"], "Added": ["y"]}), "major")
-        self.assertEqual(release_jsonl.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
-        self.assertEqual(release_jsonl.suggest_bump({"Changed": ["z"]}), "patch")
+        self.assertEqual(release_cord.suggest_bump({"Removed": ["x"], "Added": ["y"]}), "major")
+        self.assertEqual(release_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
+        self.assertEqual(release_cord.suggest_bump({"Changed": ["z"]}), "patch")
 
     def test_released_changelog(self):
-        text = (release_jsonl.upload.CHANGELOG_HEADER
+        text = (release_cord.upload.CHANGELOG_HEADER
                 + "\n## [Unreleased]\n\n### Added\n\n- `b.jsonl`\n\n"
                 "## [0.1.0] - 2026-10-27\n\n### Added\n\n- `a.jsonl`\n\n"
                 "[Unreleased]: https://github.com/Owner/Repo/compare/0.1.0...HEAD\n"
                 "[0.1.0]: https://github.com/Owner/Repo/releases/tag/0.1.0\n")
-        result = release_jsonl.released_changelog(
+        result = release_cord.released_changelog(
             text, "0.2.0", "2026-10-28", "0.1.0", "Owner", "Repo")
-        self.assertEqual(result, release_jsonl.upload.CHANGELOG_HEADER + textwrap.dedent("""
+        self.assertEqual(result, release_cord.upload.CHANGELOG_HEADER + textwrap.dedent("""
             ## [Unreleased]
 
             ## [0.2.0] - 2026-10-28

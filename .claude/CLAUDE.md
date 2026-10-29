@@ -10,11 +10,11 @@ Collections of Relatable Data (CORD): 21 JSONL files, about 1.68 GB in all, serv
 
 ## How the data is published
 
-`docs/jsonl-download-approach.md` records the decision and its reasoning. Read it before
+`docs/publishing-approach.md` records the decision and its reasoning. Read it before
 changing anything about storage. In short:
 
 - **The data files never go in git.** Two of them are over GitHub's 100 MiB limit, and
-  `/jsonl` is gitignored as a local working directory for downloads.
+  `/senzing-ready` is gitignored as a local working directory for downloads.
 - **Each file is a GitHub Release asset.** That gives it a public `curl` URL:
   `https://github.com/docktermj/senzing-cord-development-test/releases/download/<tag>/<file>`.
 - **Each file also has its own `ghcr.io` repository,**
@@ -32,26 +32,29 @@ changing anything about storage. In short:
 
 ## Commands
 
-`/upload-jsonl` (`.claude/skills/upload-jsonl/`) pushes new and changed `jsonl/*.jsonl` files
-and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
-nothing. `/release-jsonl` (`.claude/skills/release-jsonl/`) then publishes them:
+`/upload-senzing-ready` (`.claude/skills/upload-senzing-ready/`) pushes new and changed
+`senzing-ready/*.jsonl` files and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
+nothing. `/release-cord` (`.claude/skills/release-cord/`) then publishes them:
 
 - it asks for the SemVer bump;
 - it builds a draft Release and a `release-<version>` PR;
 - it asks before merging;
 - it then tags `ghcr.io` and publishes the draft on the merge commit.
 
-`/download-jsonl` (`.claude/skills/download-jsonl/`) fills `jsonl/` from the manifest:
+`/download-senzing-ready` (`.claude/skills/download-senzing-ready/`) fills `senzing-ready/` from the
+manifest. All three stop if only an old `jsonl/` directory exists; move it with
+`mv jsonl senzing-ready`.
 
 - released files come from their Release URL, and unreleased ones from `ghcr.io`;
 - each file's SHA-256 is checked;
 - a locally modified file is kept unless named with `--force <name>`.
 
-`release_jsonl.py` and `download_jsonl.py` import shared helpers from `upload_jsonl.py`. Tests:
+`release_cord.py` and `download_senzing_ready.py` import shared helpers from
+`upload_senzing_ready.py`. Tests:
 
 ```bash
-for s in upload release download; do
-  python3 -m unittest discover -s .claude/skills/$s-jsonl -p 'test_*.py'
+for s in upload-senzing-ready release-cord download-senzing-ready; do
+  python3 -m unittest discover -s .claude/skills/$s -p 'test_*.py'
 done
 ```
 

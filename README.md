@@ -2,4 +2,4 @@
 
 ## References
 
-- [JSONL file download approach](docs/jsonl-download-approach.md): how this repository publishes the CORD JSONL files, and why.
+- [JSONL file download approach](docs/publishing-approach.md): how this repository publishes the CORD JSONL files, and why.
