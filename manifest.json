@@ -16,6 +16,14 @@
       "tag": "0.1.1",
       "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl",
       "oci": "ghcr.io/docktermj/senzing-cord-development-test/ofac-london.jsonl"
+    },
+    {
+      "name": "opendata-lasvegas.jsonl",
+      "size": 980688237,
+      "sha256": "eed5ff8d46bea3ad24bf369541f35339968e646ea3b8af2ce3c02146ffae56b7",
+      "tag": "0.1.2",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl",
+      "oci": "ghcr.io/docktermj/senzing-cord-development-test/opendata-lasvegas.jsonl"
     }
   ]
 }

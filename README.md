@@ -18,12 +18,12 @@ hyphen. `/release-cord` rewrites these lists on every release.
 
 ### Las Vegas
 
-Not published yet.
+- [opendata-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl)
 
 ### London
 
-- [gleif-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/latest/download/gleif-london.jsonl)
-- [ofac-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/latest/download/ofac-london.jsonl)
+- [gleif-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/gleif-london.jsonl)
+- [ofac-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl)
 
 ### Moscow
 
