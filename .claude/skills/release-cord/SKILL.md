@@ -1,6 +1,6 @@
 ---
 name: release-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, ghcr.io version tags, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /release-cord, usually after /upload-senzing-ready. Asks for the SemVer bump and before merging.
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, ghcr.io version tags, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /release-cord; it runs the /upload-senzing-ready push itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
@@ -13,7 +13,7 @@ answer: the SemVer bump, and whether to merge.
 - Versions are bare SemVer (`0.2.0`), never `v0.2.0`. The old `v0.1.0` counts as `0.1.0`.
 - If only an old `jsonl/` directory exists, the script stops with exit 2 and prints
   `mv jsonl senzing-ready`. Show that to the user; don't move it yourself.
-- Never merge without the user's explicit yes in step 4, in this run.
+- Never merge without the user's explicit yes in step 5, in this run.
 - Never delete a draft Release, branch, tag or package, and never change package visibility.
   When a step stops, leave things as they are; a rerun resumes from the draft.
 
@@ -22,11 +22,31 @@ answer: the SemVer bump, and whether to merge.
 1. Run, from the repository root:
 
    ```bash
+   python3 .claude/skills/release-cord/release_cord.py upload
+   ```
+
+   This runs `/upload-senzing-ready` without asking: it prints a `preview:` of what it would
+   push, then pushes new and changed `senzing-ready/` files to `ghcr.io` and records them in
+   `manifest.json` and `[Unreleased]`. Large files take minutes.
+   - **`skipped: resuming draft <version>`:** a release is already in progress; go on.
+   - **Exit 1:** show the `refused:` and `failed:` lines and stop. A refused file was found
+     in the preview, so nothing was pushed; a failed push leaves the other files pushed, and a
+     rerun retries it.
+   - **Exit 2:** show the message, usually the `write:packages` fix
+     (`gh auth refresh -h github.com -s write:packages`, then
+     `gh auth token | oras login ghcr.io -u <user> --password-stdin`), and stop.
+
+   Removing a file is not part of a release: run `/upload-senzing-ready --remove <name>`
+   first.
+
+2. Run, from the repository root:
+
+   ```bash
    python3 .claude/skills/release-cord/release_cord.py status
    ```
 
    - **Exit 2:** show each `blocking:` line and stop.
-     - "Nothing to release" means running `/upload-senzing-ready` first.
+     - "Nothing to release" means nothing in `senzing-ready/` is new or changed.
      - A missing `sha256` tag means rerunning `/upload-senzing-ready` with the file in
        `senzing-ready/`.
      - "region … has no README heading" means adding the region to `REGIONS` in
@@ -34,14 +54,14 @@ answer: the SemVer bump, and whether to merge.
      - "needs openpyxl" means running `pip install openpyxl`, or `pip install .` from the
        repository root.
    - **`draft: <version> (resume)`:** say so, skip the bump question, and go to the step that
-     `next:` names (`prepare` is step 3, `publish` is step 4).
+     `next:` names (`prepare` is step 4, `publish` is step 5).
 
-2. Ask the user which part of the version to bump: Major, Minor or Patch. Show the version
+3. Ask the user which part of the version to bump: Major, Minor or Patch. Show the version
    each choice gives (the `major:`, `minor:` and `patch:` lines) and recommend the
    `suggested bump:`. It is Major if `[Unreleased]` has Removed lines, Minor if it has Added
    lines, and Patch otherwise. Wait for the answer.
 
-3. Run, with the chosen bump:
+4. Run, with the chosen bump:
 
    ```bash
    python3 .claude/skills/release-cord/release_cord.py prepare --bump <major|minor|patch>
@@ -59,7 +79,7 @@ answer: the SemVer bump, and whether to merge.
    Report the `pull request:` URL. Exit 2 means it stopped; show the message. A rerun (go back
    to step 1) resumes the draft.
 
-4. Show the PR and ask: "Merge `<PR URL>` with `--merge --delete-branch`, then tag
+5. Show the PR and ask: "Merge `<PR URL>` with `--merge --delete-branch`, then tag
    `ghcr.io` and publish `<version>`?" Wait for an explicit yes.
    - **No:** say that the draft Release and the branch are left in place, that no
      `ghcr.io` tag was added, and that `/release-cord` resumes later. Stop.
@@ -73,7 +93,7 @@ answer: the SemVer bump, and whether to merge.
      publishes the draft on the merge commit as the latest Release, switches the clone to an
      updated `main`, and downloads each file in the Release to check its SHA-256.
 
-5. Report the merge commit, the `tagged:` and `published:` lines, and each `verified:` line.
+6. Report the merge commit, the `tagged:` and `published:` lines, and each `verified:` line.
    Exit 1 means a download didn't match `manifest.json`: list the `MISMATCH:` lines and
    leave the Release as it is for the user to look at. Exit 2 means it stopped before
    publishing, for example because branch protection refused the merge. Show the message;

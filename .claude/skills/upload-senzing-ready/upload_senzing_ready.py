@@ -352,13 +352,14 @@ def plan(root, manifest, registry, removals):
     return pushes, current, refused
 
 
-def run(root, removals, dry_run, out=None):
+def run(root, removals, dry_run, out=None, repo=None):
+    """repo is "owner/name"; by default it comes from the origin remote."""
     out = out or sys.stdout
     manifest_path = os.path.join(root, "manifest.json")
     changelog_path = os.path.join(root, "CHANGELOG.md")
     ready_dir = working_dir(root)
 
-    owner, repo = github_repo(root)
+    owner, repo = repo.split("/", 1) if repo else github_repo(root)
     registry = f"ghcr.io/{owner}/{repo}".lower()
     source_url = f"https://github.com/{owner}/{repo}"
     manifest = load_manifest(manifest_path)
