@@ -1,0 +1,12 @@
+[project]
+name = "senzing-cord-development-test"
+version = "0.0.0"
+description = "Tools that publish the Senzing CORD data files"
+requires-python = ">=3.10"
+dependencies = [
+    "openpyxl>=3.1",  # bin/get_cord_stats.py, run by /release-cord
+]
+
+[tool.setuptools]
+# Not a Python package: `pip install .` only installs the dependencies above.
+packages = []
