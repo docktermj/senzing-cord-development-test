@@ -69,6 +69,9 @@ file's size.
 Before a push, each file must:
 
 - have a name that matches `^[a-z0-9][a-z0-9._-]*\.jsonl$`;
+- have a name of the form `<source>-<region>.jsonl`, where the region (after the last hyphen)
+  is a key of `REGIONS` in `upload_senzing_ready.py`. To add a region, add it there with its
+  README heading;
 - be at most 2 GiB;
 - have every line parse as JSON.
 

@@ -38,12 +38,6 @@ REF_DEF = re.compile(r"^\[([^\]]+)\]:\s")
 README_SECTION = "## CORDs"
 STATS_FILE = "CORD_stats.xlsx"
 STATS_SCRIPT = os.path.join("bin", "get_cord_stats.py")
-# README.md heading for each region, the part of a file name after the last hyphen.
-REGIONS = {
-    "lasvegas": "Las Vegas",
-    "london": "London",
-    "moscow": "Moscow",
-}
 
 
 # --- Commands -----------------------------------------------------------------
@@ -168,16 +162,10 @@ def released_changelog(text, version, date, previous_tag, owner, repo):
 
 def region_of(name):
     """Return the region of <source>-<region>.jsonl, which must have a README heading."""
-    stem = name[: -len(".jsonl")] if name.endswith(".jsonl") else name
-    if "-" not in stem:
-        raise StopError(f"{name}: expected <source>-<region>.jsonl")
-    region = stem.rsplit("-", 1)[1]
-    if region not in REGIONS:
-        raise StopError(
-            f"{name}: region {region!r} has no README heading; add it to REGIONS in "
-            "release_cord.py"
-        )
-    return region
+    error = upload.region_error(name)
+    if error:
+        raise StopError(error)
+    return name[: -len(".jsonl")].rsplit("-", 1)[1]
 
 
 def readme_cords(text, entries):
@@ -195,7 +183,7 @@ def readme_cords(text, entries):
     while intro and not intro[-1].strip():
         intro.pop()
     section = [README_SECTION] + intro + [""]
-    for region, heading in sorted(REGIONS.items(), key=lambda item: item[1]):
+    for region, heading in sorted(upload.REGIONS.items(), key=lambda item: item[1]):
         files = sorted(
             (e["name"], e["url"]) for e in entries if region_of(e["name"]) == region
         )

@@ -161,109 +161,109 @@ class UploadTest(unittest.TestCase):
         self.assertIn("mv jsonl senzing-ready", output)
 
     def test_new_file_is_pushed_and_added(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         code, _ = self.run_upload()
         self.assertEqual(code, 0)
         self.assertEqual(
-            self.manifest()["a.jsonl"],
+            self.manifest()["a-london.jsonl"],
             {
-                "name": "a.jsonl", "size": len(LINES_A), "sha256": sha(LINES_A),
-                "tag": None, "url": None, "oci": f"{REGISTRY}/a.jsonl",
+                "name": "a-london.jsonl", "size": len(LINES_A), "sha256": sha(LINES_A),
+                "tag": None, "url": None, "oci": f"{REGISTRY}/a-london.jsonl",
             },
         )
-        self.assertIn("## [Unreleased]\n\n### Added\n\n- `a.jsonl`", self.changelog())
+        self.assertIn("## [Unreleased]\n\n### Added\n\n- `a-london.jsonl`", self.changelog())
         self.assertTrue(self.changelog().startswith("# Changelog\n"))
 
     def test_push_uses_tag_and_metadata(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         self.run_upload()
         self.assertEqual(
             self.pushes(),
             [[
-                "push", f"{REGISTRY}/a.jsonl:sha256-{sha(LINES_A)}",
+                "push", f"{REGISTRY}/a-london.jsonl:sha256-{sha(LINES_A)}",
                 "--artifact-type", "application/vnd.senzing.cord.v1",
                 "--annotation", "org.opencontainers.image.source=https://github.com/Owner/Repo",
-                "a.jsonl:application/x-ndjson",
+                "a-london.jsonl:application/x-ndjson",
             ]],
         )
 
     def test_changed_file_is_pushed_and_unreleased(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A, source="https://example.com/a"))
-        self.write_jsonl("a.jsonl", LINES_B)
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A, source="https://example.com/a"))
+        self.write_jsonl("a-london.jsonl", LINES_B)
         code, _ = self.run_upload()
         self.assertEqual(code, 0)
-        entry = self.manifest()["a.jsonl"]
+        entry = self.manifest()["a-london.jsonl"]
         self.assertEqual((entry["sha256"], entry["size"]), (sha(LINES_B), len(LINES_B)))
         self.assertEqual((entry["tag"], entry["url"]), (None, None))
         self.assertEqual(entry["source"], "https://example.com/a")
-        self.assertIn("### Changed\n\n- `a.jsonl`", self.changelog())
+        self.assertIn("### Changed\n\n- `a-london.jsonl`", self.changelog())
 
     def test_current_file_is_not_pushed(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A))
-        self.seed_registry("a.jsonl", LINES_A)
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A))
+        self.seed_registry("a-london.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         before = read(os.path.join(self.root, "manifest.json"))
         code, output = self.run_upload()
         self.assertEqual(code, 0)
         self.assertEqual(self.pushes(), [])
         self.assertEqual(read(os.path.join(self.root, "manifest.json")), before)
-        self.assertIn("current: a.jsonl", output)
+        self.assertIn("current: a-london.jsonl", output)
 
     def test_missing_tag_is_repaired_without_changelog(self):
-        old = self.entry("a.jsonl", LINES_A, oci="ghcr.io/owner/repo:v0.1.0")
+        old = self.entry("a-london.jsonl", LINES_A, oci="ghcr.io/owner/repo:v0.1.0")
         self.write_manifest(old)
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         code, _ = self.run_upload()
         self.assertEqual(code, 0)
         self.assertEqual(len(self.pushes()), 1)
-        self.assertEqual(self.manifest()["a.jsonl"], {**old, "oci": f"{REGISTRY}/a.jsonl"})
+        self.assertEqual(self.manifest()["a-london.jsonl"], {**old, "oci": f"{REGISTRY}/a-london.jsonl"})
         self.assertIsNone(self.changelog())
 
     def test_entry_without_local_file_is_untouched(self):
-        other = self.entry("b.jsonl", LINES_B)
+        other = self.entry("b-london.jsonl", LINES_B)
         self.write_manifest(other)
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         self.run_upload()
-        self.assertEqual(self.manifest()["b.jsonl"], other)
+        self.assertEqual(self.manifest()["b-london.jsonl"], other)
 
     def test_remove_touches_manifest_only(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A), self.entry("b.jsonl", LINES_B))
-        code, _ = self.run_upload("--remove", "b.jsonl")
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A), self.entry("b-london.jsonl", LINES_B))
+        code, _ = self.run_upload("--remove", "b-london.jsonl")
         self.assertEqual(code, 0)
-        self.assertEqual(list(self.manifest()), ["a.jsonl"])
-        self.assertIn("### Removed\n\n- `b.jsonl`\n", self.changelog())
+        self.assertEqual(list(self.manifest()), ["a-london.jsonl"])
+        self.assertIn("### Removed\n\n- `b-london.jsonl`\n", self.changelog())
         self.assertFalse(os.path.exists(os.path.join(self.state, "calls.log")))
 
     def test_remove_unknown_name_stops(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A))
-        self.write_jsonl("c.jsonl", LINES_A)
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A))
+        self.write_jsonl("c-london.jsonl", LINES_A)
         code, output = self.run_upload("--remove", "nope.jsonl")
         self.assertEqual(code, 2)
         self.assertIn("nope.jsonl", output)
         self.assertEqual(self.pushes(), [])
 
     def test_second_run_pushes_nothing(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         self.run_upload()
         self.run_upload()
         self.assertEqual(len(self.pushes()), 1)
 
     def test_changelog_keeps_one_line_per_file(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A))
-        self.write_jsonl("a.jsonl", LINES_B)
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A))
+        self.write_jsonl("a-london.jsonl", LINES_B)
         self.run_upload()
-        self.write_jsonl("a.jsonl", LINES_B + b'{"RECORD_ID": "4"}\n')
+        self.write_jsonl("a-london.jsonl", LINES_B + b'{"RECORD_ID": "4"}\n')
         self.run_upload()
-        self.assertEqual(self.changelog().count("- `a.jsonl`"), 1)
+        self.assertEqual(self.changelog().count("- `a-london.jsonl`"), 1)
 
     def test_added_stays_added_when_changed_again(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         self.run_upload()
-        self.write_jsonl("a.jsonl", LINES_B)
+        self.write_jsonl("a-london.jsonl", LINES_B)
         self.run_upload()
         changelog = self.changelog()
-        self.assertEqual(changelog.count("- `a.jsonl`"), 1)
-        self.assertIn(f"### Added\n\n- `a.jsonl` ({len(LINES_B):,} bytes, SHA-256 `{sha(LINES_B)}`)", changelog)
+        self.assertEqual(changelog.count("- `a-london.jsonl`"), 1)
+        self.assertIn(f"### Added\n\n- `a-london.jsonl` ({len(LINES_B):,} bytes, SHA-256 `{sha(LINES_B)}`)", changelog)
         self.assertNotIn("### Changed", changelog)
 
     def test_unreleased_goes_above_existing_release(self):
@@ -273,7 +273,7 @@ class UploadTest(unittest.TestCase):
                 + "\n## [0.1.0] - 2026-10-27\n\n### Added\n\n- `old.jsonl`\n\n"
                 "[0.1.0]: https://example.com/0.1.0\n"
             )
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         self.run_upload()
         changelog = self.changelog()
         self.assertLess(changelog.index("## [Unreleased]"), changelog.index("## [0.1.0]"))
@@ -281,18 +281,30 @@ class UploadTest(unittest.TestCase):
 
     def test_invalid_files_are_refused(self):
         self.write_jsonl("Upper.jsonl", LINES_A)
-        self.write_jsonl("bad.jsonl", b'{"RECORD_ID": "1"}\nnot json\n')
-        self.write_jsonl("blank.jsonl", b'{"RECORD_ID": "1"}\n\n{"RECORD_ID": "2"}\n')
-        self.write_jsonl("good.jsonl", LINES_A)
+        self.write_jsonl("bad-london.jsonl", b'{"RECORD_ID": "1"}\nnot json\n')
+        self.write_jsonl("blank-london.jsonl", b'{"RECORD_ID": "1"}\n\n{"RECORD_ID": "2"}\n')
+        self.write_jsonl("good-london.jsonl", LINES_A)
         code, output = self.run_upload()
         self.assertEqual(code, 1)
-        self.assertEqual(list(self.manifest()), ["good.jsonl"])
+        self.assertEqual(list(self.manifest()), ["good-london.jsonl"])
         self.assertIn("refused: Upper.jsonl: name must match", output)
-        self.assertIn("refused: bad.jsonl: line 2 is not valid JSON", output)
-        self.assertIn("refused: blank.jsonl: line 2 is not valid JSON", output)
+        self.assertIn("refused: bad-london.jsonl: line 2 is not valid JSON", output)
+        self.assertIn("refused: blank-london.jsonl: line 2 is not valid JSON", output)
+
+    def test_names_without_a_known_region_are_refused(self):
+        self.write_jsonl("bob.jsonl", LINES_A)
+        self.write_jsonl("x-paris.jsonl", LINES_A)
+        self.write_jsonl("open-sanctions-london.jsonl", LINES_B)
+        code, output = self.run_upload()
+        self.assertEqual(code, 1)
+        self.assertEqual(list(self.manifest()), ["open-sanctions-london.jsonl"])
+        self.assertIn("refused: bob.jsonl: expected <source>-<region>.jsonl", output)
+        self.assertIn("refused: x-paris.jsonl: region 'paris' has no README heading; "
+                      "add it to REGIONS in upload_senzing_ready.py", output)
+        self.assertEqual(len(self.pushes()), 1)
 
     def test_oversized_file_is_refused(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         with mock.patch.object(upload_senzing_ready, "MAX_SIZE", 10):
             code, output = self.run_upload()
         self.assertEqual(code, 1)
@@ -307,7 +319,7 @@ class UploadTest(unittest.TestCase):
         self.assertIn("no .jsonl files", output)
 
     def test_unauthenticated_stops_before_changes(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         with mock.patch.dict(os.environ, {"FAKE_ORAS_UNAUTH": "1"}):
             code, output = self.run_upload()
         self.assertEqual(code, 2)
@@ -315,7 +327,7 @@ class UploadTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.root, "manifest.json")))
 
     def test_missing_write_scope_stops_before_changes(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         with mock.patch.dict(os.environ, {"FAKE_GH_SCOPES": "repo, workflow"}):
             code, output = self.run_upload()
         self.assertEqual(code, 2)
@@ -323,34 +335,34 @@ class UploadTest(unittest.TestCase):
         self.assertEqual(self.pushes(), [])
 
     def test_failed_push_leaves_entry_unchanged(self):
-        self.write_manifest(self.entry("a.jsonl", LINES_A))
-        self.write_jsonl("a.jsonl", LINES_B)
-        self.write_jsonl("b.jsonl", LINES_A)
-        with mock.patch.dict(os.environ, {"FAKE_ORAS_FAIL": "a.jsonl"}):
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A))
+        self.write_jsonl("a-london.jsonl", LINES_B)
+        self.write_jsonl("b-london.jsonl", LINES_A)
+        with mock.patch.dict(os.environ, {"FAKE_ORAS_FAIL": "a-london.jsonl"}):
             code, output = self.run_upload()
         self.assertEqual(code, 1)
         manifest = self.manifest()
-        self.assertEqual(manifest["a.jsonl"]["sha256"], sha(LINES_A))
-        self.assertIn("b.jsonl", manifest)
-        self.assertIn("failed: a.jsonl: Error: upload timed out", output)
-        self.assertNotIn("a.jsonl", self.changelog())
+        self.assertEqual(manifest["a-london.jsonl"]["sha256"], sha(LINES_A))
+        self.assertIn("b-london.jsonl", manifest)
+        self.assertIn("failed: a-london.jsonl: Error: upload timed out", output)
+        self.assertNotIn("a-london.jsonl", self.changelog())
 
     def test_dry_run_changes_nothing(self):
-        self.write_jsonl("a.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
         code, output = self.run_upload("--dry-run")
         self.assertEqual(code, 0)
-        self.assertIn("would push: a.jsonl (added)", output)
+        self.assertIn("would push: a-london.jsonl (added)", output)
         self.assertEqual(self.pushes(), [])
         self.assertFalse(os.path.exists(os.path.join(self.root, "manifest.json")))
 
     def test_manifest_is_sorted_by_name(self):
-        self.write_manifest(self.entry("m.jsonl", LINES_B))
-        self.write_jsonl("z.jsonl", LINES_A)
-        self.write_jsonl("a.jsonl", LINES_B)
+        self.write_manifest(self.entry("m-london.jsonl", LINES_B))
+        self.write_jsonl("z-london.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_B)
         self.run_upload()
         with open(os.path.join(self.root, "manifest.json")) as file:
             names = [entry["name"] for entry in json.load(file)["files"]]
-        self.assertEqual(names, ["a.jsonl", "m.jsonl", "z.jsonl"])
+        self.assertEqual(names, ["a-london.jsonl", "m-london.jsonl", "z-london.jsonl"])
 
 
 if __name__ == "__main__":

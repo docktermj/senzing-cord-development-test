@@ -21,6 +21,13 @@ ARTIFACT_TYPE = "application/vnd.senzing.cord.v1"
 MEDIA_TYPE = "application/x-ndjson"
 MAX_SIZE = 2 * 1024**3  # GitHub Release asset limit
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.jsonl$")
+# README.md heading for each region, the part of a file name after the last hyphen.
+# /release-cord groups the README file lists by these.
+REGIONS = {
+    "lasvegas": "Las Vegas",
+    "london": "London",
+    "moscow": "Moscow",
+}
 CHUNK = 1024 * 1024
 
 # Keep a Changelog section order.
@@ -81,10 +88,25 @@ def sha256_and_size(path):
     return digest.hexdigest(), size
 
 
+def region_error(name):
+    """Return why name is not <source>-<region>.jsonl with a known region, or None."""
+    stem = name[: -len(".jsonl")] if name.endswith(".jsonl") else name
+    source, _, region = stem.rpartition("-")
+    if not source or not region:
+        return f"{name}: expected <source>-<region>.jsonl"
+    if region not in REGIONS:
+        return (f"{name}: region {region!r} has no README heading; add it to REGIONS in "
+                "upload_senzing_ready.py")
+    return None
+
+
 def validation_error(path, name, size):
     """Return why the file may not be pushed, or None."""
     if not NAME_PATTERN.match(name):
         return f"name must match {NAME_PATTERN.pattern}"
+    error = region_error(name)
+    if error:
+        return error.split(": ", 1)[1]
     if size > MAX_SIZE:
         return f"{size:,} bytes is over the 2 GiB limit"
     with open(path, "rb") as file:
