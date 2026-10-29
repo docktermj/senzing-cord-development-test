@@ -36,8 +36,10 @@ changing anything about storage. In short:
 
 `/upload-senzing-ready` (`.claude/skills/upload-senzing-ready/`) pushes new and changed
 `senzing-ready/*.jsonl` files and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
-nothing. `/release-cord` (`.claude/skills/release-cord/`) then publishes them:
+nothing. `/release-cord` (`.claude/skills/release-cord/`) publishes them:
 
+- it first runs the upload itself (`release_cord.py upload`): a preview, then the push, stopping
+  on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
 - it builds a draft Release of the new and changed files, and a `release-<version>` PR that
   also rewrites the `## CORDs` lists in `README.md` and the files' rows in `CORD_stats.xlsx`

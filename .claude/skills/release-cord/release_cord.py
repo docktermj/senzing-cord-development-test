@@ -3,13 +3,15 @@
 
 The release-cord skill runs the subcommands in order, asking the user between them:
 
+  upload            push new and changed senzing-ready/ files (/upload-senzing-ready),
+                    after printing a preview; skipped while a draft is being resumed
   status            report the version, the suggested bump, a draft to resume, and blockers
   prepare --bump B  draft Release with the new and changed files; update README.md and
                     CORD_stats.xlsx; branch, commit, push and PR
   publish           merge the PR, tag ghcr.io, publish the draft, verify downloads
 
 Every step can be rerun. A draft Release above the latest version is resumed.
-Exit codes: 0 success, 1 verification failed, 2 stopped.
+Exit codes: 0 success, 1 upload refused or failed, or verification failed, 2 stopped.
 """
 
 import argparse
@@ -335,6 +337,21 @@ def status(ctx, out):
     return 2 if problems else 0
 
 
+def upload_step(ctx, out):
+    """Run /upload-senzing-ready: a preview, then the push unless a file is refused."""
+    draft = ctx.draft()
+    if draft:
+        print(f"skipped: resuming draft {draft}", file=out)
+        return 0
+    repo = f"{ctx.owner}/{ctx.repo}"
+    print("preview:", file=out)
+    if upload.run(ctx.root, [], dry_run=True, out=out, repo=repo):
+        print("stopped: fix or remove the refused files, then rerun", file=out)
+        return 1
+    print("upload:", file=out)
+    return upload.run(ctx.root, [], dry_run=False, out=out, repo=repo)
+
+
 def gather_assets(ctx, entries, directory):
     """Copy or fetch each entry's file into directory, checking each SHA-256."""
     paths = []
@@ -511,6 +528,7 @@ def main(argv=None):
     parser.add_argument("--root", help="repository root (default: from git)")
     parser.add_argument("--repo", help="owner/name (default: from the origin remote)")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("upload")
     commands.add_parser("status")
     prepare_parser = commands.add_parser("prepare")
     prepare_parser.add_argument("--bump", choices=["major", "minor", "patch"])
@@ -521,6 +539,8 @@ def main(argv=None):
         root = args.root or upload.git(os.getcwd(), "rev-parse", "--show-toplevel")
         upload.working_dir(root)
         ctx = Context(root, args.repo)
+        if args.command == "upload":
+            return upload_step(ctx, out)
         if args.command == "status":
             return status(ctx, out)
         if args.command == "prepare":

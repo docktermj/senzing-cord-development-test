@@ -97,6 +97,8 @@ FAKE_GH = textwrap.dedent(
         pr.update(state="MERGED", mergeCommit={"oid": git("rev-parse", "HEAD")})
         shutil.rmtree(work)
         save()
+    elif args[:2] == ["api", "-i"]:
+        print("HTTP/2.0 200 OK\\nX-Oauth-Scopes: repo, write:packages\\n\\n{}")
     else:
         sys.exit("fake gh: unsupported " + " ".join(args))
     """
@@ -136,6 +138,14 @@ FAKE_ORAS = textwrap.dedent(
     elif args[0] == "tag":
         repository = args[1].rsplit(":", 1)[0]
         shutil.copy(path(args[1]), path(f"{repository}:{args[2]}"))
+    elif args[0] == "push":
+        import hashlib
+        name = args[-1].rsplit(":", 1)[0]
+        data = open(name, "rb").read()
+        digest = hashlib.sha256(data).hexdigest()
+        with open(path(args[1]), "w") as f:
+            json.dump({"layers": [{"digest": f"sha256:{digest}", "size": len(data)}]}, f)
+        open(os.path.join(state, "blobs", digest), "wb").write(data)
     elif args[:2] == ["blob", "fetch"]:
         digest = args[-1].split("@sha256:")[1]
         shutil.copy(os.path.join(state, "blobs", digest), args[args.index("--output") + 1])
@@ -174,6 +184,7 @@ README = textwrap.dedent(
 
 FILE_A = b'{"RECORD_ID": "1"}\n'
 FILE_B = b'{"RECORD_ID": "2"}\n{"RECORD_ID": "3"}\n'
+FILE_C = b'{"RECORD_ID": "4"}\n'
 
 
 def sha(data):
@@ -349,6 +360,58 @@ class ReleaseTest(unittest.TestCase):
             [0.2.0]: https://github.com/Owner/Repo/compare/0.1.0...0.2.0
             [0.1.0]: https://github.com/Owner/Repo/releases/tag/0.1.0
             """))
+
+    # --- upload ---
+
+    def write_ready(self, name, data):
+        with open(os.path.join(self.root, "senzing-ready", name), "wb") as file:
+            file.write(data)
+
+    def test_upload_pushes_a_new_file_then_status_offers_the_bump(self):
+        self.write_ready("c-moscow.jsonl", FILE_C)
+        code, output = self.release("upload")
+        self.assertEqual(code, 0, output)
+        self.assertLess(output.index("preview:"), output.index("pushed: c-moscow.jsonl"))
+        self.assertIn("would push: c-moscow.jsonl (added)", output)
+        self.assertEqual([c[:2] for c in self.calls("oras") if c[0] == "push"],
+                         [["push", f"{REGISTRY}/c-moscow.jsonl:sha256-{sha(FILE_C)}"]])
+        manifest = json.loads(read(os.path.join(self.root, "manifest.json")))
+        self.assertIn({"name": "c-moscow.jsonl", "tag": None},
+                      [{"name": e["name"], "tag": e["tag"]} for e in manifest["files"]])
+        self.assertIn("- `c-moscow.jsonl`", read(os.path.join(self.root, "CHANGELOG.md")))
+        code, output = self.release("status")
+        self.assertEqual(code, 0, output)
+        self.assertIn("next: prepare", output)
+
+    def test_upload_stops_on_a_refused_file_before_any_push(self):
+        self.write_ready("c-moscow.jsonl", FILE_C)
+        self.write_ready("bob.jsonl", FILE_C)
+        code, output = self.release("upload")
+        self.assertEqual(code, 1)
+        self.assertIn("refused: bob.jsonl: expected <source>-<region>.jsonl", output)
+        self.assertNotIn("upload:", output)
+        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
+        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+
+    def test_upload_with_nothing_new_then_nothing_to_release(self):
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
+        os.remove(os.path.join(self.root, "CHANGELOG.md"))
+        os.remove(os.path.join(self.root, "senzing-ready", "b-london.jsonl"))
+        code, output = self.release("upload")
+        self.assertEqual(code, 0, output)
+        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
+        code, output = self.release("status")
+        self.assertEqual(code, 2)
+        self.assertIn("nothing to release", output)
+
+    def test_upload_is_skipped_while_resuming_a_draft(self):
+        self.release("prepare", "--bump", "minor")
+        self.git("switch", "-q", "main")
+        self.write_ready("c-moscow.jsonl", FILE_C)
+        code, output = self.release("upload")
+        self.assertEqual(code, 0, output)
+        self.assertIn("skipped: resuming draft 0.2.0", output)
+        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
 
     # --- status ---
 
