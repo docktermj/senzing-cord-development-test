@@ -19,6 +19,7 @@ hyphen. `/release-cord` rewrites these lists on every release.
 ### Las Vegas
 
 - [opendata-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl)
+- [opendata2-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.3/opendata2-lasvegas.jsonl)
 
 ### London
 
