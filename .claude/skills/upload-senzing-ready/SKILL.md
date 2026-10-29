@@ -1,19 +1,21 @@
 ---
-name: upload-jsonl
-description: Push new and changed CORD JSONL files from the local jsonl/ directory to ghcr.io, and record them in manifest.json and the [Unreleased] section of CHANGELOG.md. Use when the user runs /upload-jsonl. Commits nothing; /release-jsonl publishes the result.
+name: upload-senzing-ready
+description: Push new and changed CORD JSONL files from the local senzing-ready/ directory to ghcr.io, and record them in manifest.json and the [Unreleased] section of CHANGELOG.md. Use when the user runs /upload-senzing-ready. Commits nothing; /release-cord publishes the result.
 disable-model-invocation: true
 argument-hint: "[--remove <name>]..."
 ---
 
-Push every `jsonl/*.jsonl` file whose SHA-256 differs from `manifest.json`, or that has no
+Push every `senzing-ready/*.jsonl` file whose SHA-256 differs from `manifest.json`, or that has no
 entry, to its own `ghcr.io` repository, then update `manifest.json` and `CHANGELOG.md` in the
-working tree. The script `upload_jsonl.py` next to this file does the work; this skill runs
+working tree. The script `upload_senzing_ready.py` next to this file does the work; this skill runs
 it and reports.
 
 ## Rules
 
-- `jsonl/` is the gitignored directory at the root of the clone, not `/jsonl`.
-- A manifest entry with no file in `jsonl/` is left alone. Remove an entry only when the user
+- `senzing-ready/` is the gitignored directory at the root of the clone, not `/senzing-ready`.
+- If only an old `jsonl/` directory exists, the script stops with exit 2 and prints
+  `mv jsonl senzing-ready`. Show that to the user; don't move it yourself.
+- A manifest entry with no file in `senzing-ready/` is left alone. Remove an entry only when the user
   names it in `$ARGUMENTS` with `--remove <name>`. Removal changes the manifest and
   CHANGELOG only, never `ghcr.io` or a Release.
 - Never commit, push a branch, create a Release or change package visibility.
@@ -23,7 +25,7 @@ it and reports.
 1. Run the preview from the repository root, passing any `--remove` arguments the user gave:
 
    ```bash
-   python3 .claude/skills/upload-jsonl/upload_jsonl.py --dry-run $ARGUMENTS
+   python3 .claude/skills/upload-senzing-ready/upload_senzing_ready.py --dry-run $ARGUMENTS
    ```
 
    Exit 2 means it stopped before changing anything. Show the message, which says how to fix
@@ -37,7 +39,7 @@ it and reports.
 3. Run it for real:
 
    ```bash
-   python3 .claude/skills/upload-jsonl/upload_jsonl.py $ARGUMENTS
+   python3 .claude/skills/upload-senzing-ready/upload_senzing_ready.py $ARGUMENTS
    ```
 
    Large files take minutes to push. `ghcr.io` times out an upload after 10 minutes.
@@ -46,7 +48,7 @@ it and reports.
    `failed`), then show `git diff -- manifest.json CHANGELOG.md`. Exit 1 means some files
    were refused or failed. Their entries are unchanged, and a rerun retries them.
 
-5. Remind the user that nothing is committed, and that `/release-jsonl` publishes the
+5. Remind the user that nothing is committed, and that `/release-cord` publishes the
    changes.
 
 ## What the script does
@@ -60,7 +62,7 @@ it and reports.
 
 Each push is
 `oras push ghcr.io/<owner>/<repo>/<name>:sha256-<hex> --artifact-type application/vnd.senzing.cord.v1 --annotation org.opencontainers.image.source=https://github.com/<owner>/<repo> <name>:application/x-ndjson`,
-run from `jsonl/`. The owner and repo come from the `origin` remote. After each push, the
+run from `senzing-ready/`. The owner and repo come from the `origin` remote. After each push, the
 script reads the manifest back and confirms that the only layer is `sha256:<hex>` with the
 file's size.
 
@@ -77,7 +79,7 @@ to write. `[Unreleased]` holds at most one line per file.
 ## Tests
 
 ```bash
-python3 -m unittest discover -s .claude/skills/upload-jsonl -p 'test_*.py'
+python3 -m unittest discover -s .claude/skills/upload-senzing-ready -p 'test_*.py'
 ```
 
 The tests run the script against fake `oras` and `gh` executables, so they need no network.

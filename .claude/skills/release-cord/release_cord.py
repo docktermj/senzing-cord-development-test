@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Publish a SemVer release of the CORD JSONL files.
 
-The release-jsonl skill runs the subcommands in order, asking the user between them:
+The release-cord skill runs the subcommands in order, asking the user between them:
 
   status            report the version, the suggested bump, a draft to resume, and blockers
   prepare --bump B  draft Release with every file; branch, commit, push and PR
@@ -23,10 +23,10 @@ import sys
 import tempfile
 
 sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upload-jsonl")
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upload-senzing-ready")
 )
-import upload_jsonl as upload  # noqa: E402
-from upload_jsonl import StopError  # noqa: E402
+import upload_senzing_ready as upload  # noqa: E402
+from upload_senzing_ready import StopError  # noqa: E402
 
 BASE = "main"
 VERSION_PATTERN = re.compile(r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
@@ -267,7 +267,7 @@ def gather_assets(ctx, entries, directory):
     """Copy or fetch each entry's file into directory, checking each SHA-256."""
     paths = []
     for entry in entries:
-        local = os.path.join(ctx.root, "jsonl", entry["name"])
+        local = os.path.join(ctx.root, "senzing-ready", entry["name"])
         target = os.path.join(directory, entry["name"])
         if os.path.isfile(local) and upload.sha256_and_size(local)[0] == entry["sha256"]:
             shutil.copyfile(local, target)
@@ -428,6 +428,7 @@ def main(argv=None):
     out = sys.stdout
     try:
         root = args.root or upload.git(os.getcwd(), "rev-parse", "--show-toplevel")
+        upload.working_dir(root)
         ctx = Context(root, args.repo)
         if args.command == "status":
             return status(ctx, out)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Download every file in manifest.json into jsonl/, checking each SHA-256.
+"""Download every file in manifest.json into senzing-ready/, checking each SHA-256.
 
 Released entries come from their public Release URL; unreleased entries (url
 null) come from ghcr.io with oras. A current file is skipped, and a file whose
 SHA-256 differs is kept unless named with --force.
 
-Exit codes: 0 jsonl/ matches the manifest, 1 some entries failed or are
+Exit codes: 0 senzing-ready/ matches the manifest, 1 some entries failed or are
 locally modified, 2 stopped before downloading anything.
 """
 
@@ -16,10 +16,10 @@ import subprocess
 import sys
 
 sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upload-jsonl")
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upload-senzing-ready")
 )
-import upload_jsonl as upload  # noqa: E402
-from upload_jsonl import StopError  # noqa: E402
+import upload_senzing_ready as upload  # noqa: E402
+from upload_senzing_ready import StopError  # noqa: E402
 
 
 def fetch(entry, target):
@@ -51,12 +51,12 @@ def run(root, force, out=None):
     if unknown:
         raise StopError(f"not in manifest.json, cannot --force: {', '.join(unknown)}")
 
-    jsonl_dir = os.path.join(root, "jsonl")
-    os.makedirs(jsonl_dir, exist_ok=True)
+    ready_dir = upload.working_dir(root)
+    os.makedirs(ready_dir, exist_ok=True)
     results = {"downloaded": [], "current": [], "modified": [], "failed": []}
     for entry in sorted(entries, key=lambda e: e["name"]):
         name = entry["name"]
-        path = os.path.join(jsonl_dir, name)
+        path = os.path.join(ready_dir, name)
         if os.path.isfile(path):
             if upload.sha256_and_size(path)[0] == entry["sha256"]:
                 results["current"].append(name)
@@ -64,7 +64,7 @@ def run(root, force, out=None):
             if name not in force:
                 results["modified"].append(name)
                 continue
-        temp = os.path.join(jsonl_dir, f".{name}.part")
+        temp = os.path.join(ready_dir, f".{name}.part")
         print(f"downloading {name} ({entry['size']:,} bytes)", file=out, flush=True)
         try:
             error = fetch(entry, temp)

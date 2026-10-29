@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Push new and changed jsonl/*.jsonl files to ghcr.io and record them.
+"""Push new and changed senzing-ready/*.jsonl files to ghcr.io and record them.
 
 Each file goes to its own ghcr.io repository, <registry>/<name>, under the tag
 sha256-<hex>. manifest.json and the [Unreleased] section of CHANGELOG.md are
@@ -61,6 +61,14 @@ def github_repo(root):
 
 
 # --- Files --------------------------------------------------------------------
+
+
+def working_dir(root):
+    """Return the senzing-ready/ directory, stopping if only the old jsonl/ exists."""
+    ready_dir = os.path.join(root, "senzing-ready")
+    if os.path.isdir(os.path.join(root, "jsonl")) and not os.path.isdir(ready_dir):
+        raise StopError("move your local files with: mv jsonl senzing-ready")
+    return ready_dir
 
 
 def sha256_and_size(path):
@@ -136,14 +144,14 @@ def check_write_scope():
             return
 
 
-def push(jsonl_dir, ref, name, sha256, size, source_url):
+def push(ready_dir, ref, name, sha256, size, source_url):
     """Push one file and confirm the registry holds it as a single layer."""
     result = oras(
         "push", ref,
         "--artifact-type", ARTIFACT_TYPE,
         "--annotation", f"org.opencontainers.image.source={source_url}",
         f"{name}:{MEDIA_TYPE}",
-        cwd=jsonl_dir,
+        cwd=ready_dir,
     )
     if result.returncode != 0:
         return result.stderr.strip() or "oras push failed"
@@ -290,19 +298,19 @@ def update_changelog(path, changes):
 
 
 def plan(root, manifest, registry, removals):
-    """Classify every jsonl/*.jsonl file. Returns (pushes, current, refused)."""
+    """Classify every senzing-ready/*.jsonl file. Returns (pushes, current, refused)."""
     entries = {entry["name"]: entry for entry in manifest["files"]}
-    jsonl_dir = os.path.join(root, "jsonl")
+    ready_dir = working_dir(root)
     names = sorted(
         n
-        for n in (os.listdir(jsonl_dir) if os.path.isdir(jsonl_dir) else [])
-        if n.endswith(".jsonl") and os.path.isfile(os.path.join(jsonl_dir, n))
+        for n in (os.listdir(ready_dir) if os.path.isdir(ready_dir) else [])
+        if n.endswith(".jsonl") and os.path.isfile(os.path.join(ready_dir, n))
     )
     pushes, current, refused = [], [], []
     for name in names:
         if name in removals:
             continue
-        path = os.path.join(jsonl_dir, name)
+        path = os.path.join(ready_dir, name)
         sha256, size = sha256_and_size(path)
         entry = entries.get(name)
         if entry is None:
@@ -326,7 +334,7 @@ def run(root, removals, dry_run, out=None):
     out = out or sys.stdout
     manifest_path = os.path.join(root, "manifest.json")
     changelog_path = os.path.join(root, "CHANGELOG.md")
-    jsonl_dir = os.path.join(root, "jsonl")
+    ready_dir = working_dir(root)
 
     owner, repo = github_repo(root)
     registry = f"ghcr.io/{owner}/{repo}".lower()
@@ -351,7 +359,7 @@ def run(root, removals, dry_run, out=None):
             pushed.append(item)
             continue
         print(f"pushing {item['name']} ({item['size']:,} bytes)", file=out, flush=True)
-        error = push(jsonl_dir, ref, item["name"], item["sha256"], item["size"], source_url)
+        error = push(ready_dir, ref, item["name"], item["sha256"], item["size"], source_url)
         if error:
             failed.append((item["name"], error))
         else:
@@ -396,7 +404,7 @@ def run(root, removals, dry_run, out=None):
     for name, error in failed:
         print(f"failed: {name}: {error}", file=out)
     if not (pushed or removals or current or refused or failed):
-        print("no .jsonl files in jsonl/ and nothing to remove", file=out)
+        print("no .jsonl files in senzing-ready/ and nothing to remove", file=out)
     return 1 if refused or failed else 0
 
 

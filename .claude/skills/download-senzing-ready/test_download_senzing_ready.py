@@ -1,7 +1,7 @@
-"""Tests for download_jsonl.py, run against fake curl and oras executables.
+"""Tests for download_senzing_ready.py, run against fake curl and oras executables.
 
 Run with:
-  python3 -m unittest discover -s .claude/skills/download-jsonl -p 'test_*.py'
+  python3 -m unittest discover -s .claude/skills/download-senzing-ready -p 'test_*.py'
 """
 
 import hashlib
@@ -17,7 +17,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import download_jsonl  # noqa: E402
+import download_senzing_ready  # noqa: E402
 
 # Both fakes serve files from $FAKE_STORE: curl by the URL's last path segment,
 # oras by the digest. Every call is logged to $FAKE_STORE/calls.log.
@@ -112,15 +112,15 @@ class DownloadTest(unittest.TestCase):
             file.write(data)
 
     def local(self, name):
-        path = os.path.join(self.root, "jsonl", name)
+        path = os.path.join(self.root, "senzing-ready", name)
         if not os.path.exists(path):
             return None
         with open(path, "rb") as file:
             return file.read()
 
     def write_local(self, name, data):
-        os.makedirs(os.path.join(self.root, "jsonl"), exist_ok=True)
-        with open(os.path.join(self.root, "jsonl", name), "wb") as file:
+        os.makedirs(os.path.join(self.root, "senzing-ready"), exist_ok=True)
+        with open(os.path.join(self.root, "senzing-ready", name), "wb") as file:
             file.write(data)
 
     def calls(self):
@@ -133,18 +133,33 @@ class DownloadTest(unittest.TestCase):
     def download(self, *args):
         out = io.StringIO()
         with mock.patch("sys.stdout", out), mock.patch("sys.stderr", out):
-            code = download_jsonl.main(["--root", self.root, *args])
+            code = download_senzing_ready.main(["--root", self.root, *args])
         return code, out.getvalue()
 
     # --- tests ---
 
-    def test_downloads_every_entry_into_new_jsonl_dir(self):
+    def test_old_jsonl_dir_alone_stops(self):
+        os.makedirs(os.path.join(self.root, "jsonl"))
+        code, output = self.download()
+        self.assertEqual(code, 2)
+        self.assertIn("mv jsonl senzing-ready", output)
+        self.assertEqual(self.calls(), [])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "senzing-ready")))
+
+    def test_old_jsonl_dir_is_ignored_when_senzing_ready_exists(self):
+        os.makedirs(os.path.join(self.root, "jsonl"))
+        os.makedirs(os.path.join(self.root, "senzing-ready"))
+        code, _ = self.download()
+        self.assertEqual(code, 0)
+        self.assertEqual(os.listdir(os.path.join(self.root, "jsonl")), [])
+
+    def test_downloads_every_entry_into_new_ready_dir(self):
         code, output = self.download()
         self.assertEqual(code, 0, output)
         self.assertEqual((self.local("a.jsonl"), self.local("b.jsonl")), (FILE_A, FILE_B))
         self.assertIn("downloaded: a.jsonl", output)
         self.assertIn("downloaded: b.jsonl", output)
-        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "jsonl"))),
+        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "senzing-ready"))),
                          ["a.jsonl", "b.jsonl"])
 
     def test_released_entry_uses_url_and_unreleased_uses_oras(self):
@@ -203,14 +218,14 @@ class DownloadTest(unittest.TestCase):
         code, output = self.download()
         self.assertEqual(code, 1)
         self.assertIn("failed: a.jsonl: SHA-256 does not match manifest.json", output)
-        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "jsonl"))), ["b.jsonl"])
+        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "senzing-ready"))), ["b.jsonl"])
 
     def test_failed_download_leaves_no_partial_file(self):
         os.remove(os.path.join(self.store, "release", "a.jsonl"))
         code, output = self.download()
         self.assertEqual(code, 1)
         self.assertIn("failed: a.jsonl: curl: (22)", output)
-        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "jsonl"))), ["b.jsonl"])
+        self.assertEqual(sorted(os.listdir(os.path.join(self.root, "senzing-ready"))), ["b.jsonl"])
 
     def test_oras_login_failure_fails_only_ghcr_entries(self):
         with mock.patch.dict(os.environ, {"FAKE_ORAS_UNAUTH": "1"}):
