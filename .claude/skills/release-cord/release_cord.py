@@ -4,7 +4,8 @@
 The release-cord skill runs the subcommands in order, asking the user between them:
 
   status            report the version, the suggested bump, a draft to resume, and blockers
-  prepare --bump B  draft Release with every file; branch, commit, push and PR
+  prepare --bump B  draft Release with the new and changed files; update README.md and
+                    CORD_stats.xlsx; branch, commit, push and PR
   publish           merge the PR, tag ghcr.io, publish the draft, verify downloads
 
 Every step can be rerun. A draft Release above the latest version is resumed.
@@ -14,6 +15,7 @@ Exit codes: 0 success, 1 verification failed, 2 stopped.
 import argparse
 import datetime
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -31,7 +33,17 @@ from upload_senzing_ready import StopError  # noqa: E402
 BASE = "main"
 VERSION_PATTERN = re.compile(r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 CHANGELOG_FILES = {"manifest.json", "CHANGELOG.md"}
+RELEASE_FILES = ("manifest.json", "CHANGELOG.md", "README.md", "CORD_stats.xlsx")
 REF_DEF = re.compile(r"^\[([^\]]+)\]:\s")
+README_SECTION = "## CORDs"
+STATS_FILE = "CORD_stats.xlsx"
+STATS_SCRIPT = os.path.join("bin", "get_cord_stats.py")
+# README.md heading for each region, the part of a file name after the last hyphen.
+REGIONS = {
+    "lasvegas": "Las Vegas",
+    "london": "London",
+    "moscow": "Moscow",
+}
 
 
 # --- Commands -----------------------------------------------------------------
@@ -151,6 +163,61 @@ def released_changelog(text, version, date, previous_tag, owner, repo):
     return "\n".join(content + [""] + new_refs + refs) + "\n"
 
 
+# --- README.md and CORD_stats.xlsx --------------------------------------------
+
+
+def region_of(name):
+    """Return the region of <source>-<region>.jsonl, which must have a README heading."""
+    stem = name[: -len(".jsonl")] if name.endswith(".jsonl") else name
+    if "-" not in stem:
+        raise StopError(f"{name}: expected <source>-<region>.jsonl")
+    region = stem.rsplit("-", 1)[1]
+    if region not in REGIONS:
+        raise StopError(
+            f"{name}: region {region!r} has no README heading; add it to REGIONS in "
+            "release_cord.py"
+        )
+    return region
+
+
+def readme_cords(text, entries):
+    """Rewrite the file lists under ## CORDs: one ### section per region, sorted."""
+    lines = text.splitlines()
+    if README_SECTION not in lines:
+        raise StopError(f"README.md has no {README_SECTION} section")
+    start = lines.index(README_SECTION)
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines)
+    )
+    intro = lines[start + 1:end]
+    intro = intro[: next((i for i, line in enumerate(intro) if line.startswith("### ")),
+                         len(intro))]
+    while intro and not intro[-1].strip():
+        intro.pop()
+    section = [README_SECTION] + intro + [""]
+    for region, heading in sorted(REGIONS.items(), key=lambda item: item[1]):
+        files = sorted(
+            (e["name"], e["url"]) for e in entries if region_of(e["name"]) == region
+        )
+        section += [f"### {heading}", ""]
+        section += [f"- [{name}]({url})" for name, url in files] or ["Not published yet."]
+        section += [""]
+    return "\n".join(lines[:start] + section + lines[end:]).rstrip("\n") + "\n"
+
+
+def openpyxl_available():
+    return importlib.util.find_spec("openpyxl") is not None
+
+
+def update_stats(root, version, date, added, changed):
+    """Run bin/get_cord_stats.py on the Added and on the Changed files."""
+    for reason, paths in ((f"Added in {version}", added), (f"Changed in {version}", changed)):
+        if paths:
+            run(sys.executable, os.path.join(root, STATS_SCRIPT), "--stats",
+                os.path.join(root, STATS_FILE), "--reason", reason, "--date", date, *paths,
+                cwd=root)
+
+
 # --- State --------------------------------------------------------------------
 
 
@@ -191,12 +258,12 @@ class Context:
             raise StopError(f"a published Release or tag {version} already exists")
 
     def pending_entries(self):
-        latest = self.latest
-        return [
-            e["name"]
-            for e in self.manifest["files"]
-            if not e.get("tag") or parse_version(e["tag"]) != latest
-        ]
+        """New and changed files: /upload-senzing-ready sets their tag to null."""
+        return [e["name"] for e in self.manifest["files"] if not e.get("tag")]
+
+    def release_entries(self, version):
+        """The files this release attaches: pending, or already tagged by a resumed run."""
+        return [e for e in self.manifest["files"] if e.get("tag") in (None, version)]
 
     def missing_blobs(self):
         return [
@@ -215,6 +282,23 @@ class Context:
 
 def blockers(ctx):
     problems = []
+    for entry in ctx.manifest["files"]:
+        try:
+            region_of(entry["name"])
+        except StopError as error:
+            problems.append(str(error))
+    if ctx.pending_entries():
+        if not openpyxl_available():
+            problems.append(f"{STATS_FILE} needs openpyxl: pip install openpyxl")
+        if not os.path.exists(os.path.join(ctx.root, STATS_FILE)):
+            problems.append(f"{STATS_FILE} not found")
+    readme = os.path.join(ctx.root, "README.md")
+    if not os.path.exists(readme):
+        problems.append("README.md not found")
+    else:
+        with open(readme, encoding="utf-8") as file:
+            if README_SECTION not in file.read().splitlines():
+                problems.append(f"README.md has no {README_SECTION} section")
     if not unreleased_sections(read_changelog(ctx.root)) and not ctx.pending_entries():
         problems.append("nothing to release: [Unreleased] is empty and every file is released")
     if not ctx.manifest["files"]:
@@ -315,45 +399,64 @@ def prepare(ctx, bump, out):
         if problems:
             raise StopError("; ".join(problems))
 
-    # Step 3: draft Release holding every manifest file.
+    # Step 3: draft Release holding the new and changed files.
+    entries = ctx.release_entries(version)
     with tempfile.TemporaryDirectory() as directory:
         if not ctx.draft():
-            paths = gather_assets(ctx, ctx.manifest["files"], directory)
+            paths = gather_assets(ctx, entries, directory)
             run("gh", "release", "create", version, "--draft", "--title", version,
                 "--notes", release_notes(ctx.owner, ctx.repo, version, date), *paths,
                 cwd=ctx.root)
         else:
             assets = gh_json(ctx.root, "release", "view", version, "--json", "assets")
             have = {(a["name"], a["size"]) for a in assets["assets"]}
-            want = [e for e in ctx.manifest["files"] if (e["name"], e["size"]) not in have]
+            want = [e for e in entries if (e["name"], e["size"]) not in have]
             if want:
                 paths = gather_assets(ctx, want, directory)
                 run("gh", "release", "upload", version, *paths, "--clobber", cwd=ctx.root)
-    print(f"draft: {version} holds every file", file=out)
+        names = ", ".join(sorted(e["name"] for e in entries)) or "no files"
+        print(f"draft: {version} holds {names}", file=out)
 
-    # Step 4: manifest and CHANGELOG on a branch, then the PR.
-    if not (local_branch or remote_branch):
-        manifest_path = os.path.join(ctx.root, "manifest.json")
-        manifest = upload.load_manifest(manifest_path)
-        for entry in manifest["files"]:
-            entry["tag"] = version
-            entry["url"] = ctx.asset_url(version, entry["name"])
-        upload.git(ctx.root, "switch", "--quiet", "-c", branch)
-        upload.write_manifest(manifest_path, manifest)
-        text = released_changelog(
-            read_changelog(ctx.root), version, date, ctx.latest_tag, ctx.owner, ctx.repo
-        )
-        with open(os.path.join(ctx.root, "CHANGELOG.md"), "w", encoding="utf-8") as file:
-            file.write(text)
-        upload.git(ctx.root, "add", "manifest.json", "CHANGELOG.md")
-        upload.git(ctx.root, "commit", "--quiet", "-m", f"chore(release): {version}")
+        # Step 4: stats, manifest, CHANGELOG and README on a branch, then the PR.
+        if not (local_branch or remote_branch):
+            # Stats come from the same bytes as the Release assets.
+            paths = gather_assets(ctx, entries, directory)
+            text = read_changelog(ctx.root)
+            added_names = {upload.line_name(line)
+                           for line in unreleased_sections(text).get("Added", [])}
+            update_stats(
+                ctx.root, version, date,
+                [p for p in paths if os.path.basename(p) in added_names],
+                [p for p in paths if os.path.basename(p) not in added_names],
+            )
+            manifest_path = os.path.join(ctx.root, "manifest.json")
+            manifest = upload.load_manifest(manifest_path)
+            for entry in manifest["files"]:
+                if entry.get("tag") in (None, version):
+                    entry["tag"] = version
+                    entry["url"] = ctx.asset_url(version, entry["name"])
+            upload.git(ctx.root, "switch", "--quiet", "-c", branch)
+            upload.write_manifest(manifest_path, manifest)
+            with open(os.path.join(ctx.root, "CHANGELOG.md"), "w", encoding="utf-8") as file:
+                file.write(released_changelog(
+                    text, version, date, ctx.latest_tag, ctx.owner, ctx.repo
+                ))
+            readme_path = os.path.join(ctx.root, "README.md")
+            with open(readme_path, encoding="utf-8") as file:
+                readme = readme_cords(file.read(), manifest["files"])
+            with open(readme_path, "w", encoding="utf-8") as file:
+                file.write(readme)
+            upload.git(ctx.root, "add", *RELEASE_FILES)
+            upload.git(ctx.root, "commit", "--quiet", "-m", f"chore(release): {version}")
     if not remote_branch:
         upload.git(ctx.root, "push", "--quiet", "-u", "origin", branch)
     url = run(
         "gh", "pr", "create", "--base", BASE, "--head", branch,
         "--title", f"chore(release): {version}",
-        "--body", f"Release {version}: updates `manifest.json` and `CHANGELOG.md`.\n\n"
-        f"Draft Release {version} holds every file; it is published after this merges.",
+        "--body", f"Release {version}: updates `manifest.json`, `CHANGELOG.md`, "
+        f"`README.md` and `{STATS_FILE}`.\n\n"
+        f"Draft Release {version} holds the new and changed files; it is published after "
+        "this merges.",
         cwd=ctx.root,
     )
     print(f"pull request: {url}", file=out)
@@ -405,9 +508,9 @@ def publish(ctx, out):
         upload.git(ctx.root, "switch", "--quiet", BASE)
         upload.git(ctx.root, "merge", "--quiet", "--ff-only", f"origin/{BASE}")
 
-    # Step 8: verify every Release URL.
+    # Step 8: verify the URL of every file this Release holds.
     failed = 0
-    for entry in manifest["files"]:
+    for entry in (e for e in manifest["files"] if e.get("tag") == version):
         actual = sha256_of_url(entry["url"])
         ok = actual == entry["sha256"]
         failed += not ok

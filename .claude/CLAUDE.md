@@ -15,7 +15,8 @@ changing anything about storage. In short:
 
 - **The data files never go in git.** Two of them are over GitHub's 100 MiB limit, and
   `/senzing-ready` is gitignored as a local working directory for downloads.
-- **Each file is a GitHub Release asset.** That gives it a public `curl` URL:
+- **Each file is a GitHub Release asset** of the Release where it last changed. That gives
+  it a public `curl` URL, the entry's `url` in `manifest.json`:
   `https://github.com/docktermj/senzing-cord-development-test/releases/download/<tag>/<file>`.
 - **Each file also has its own `ghcr.io` repository,**
   `ghcr.io/docktermj/senzing-cord-development-test/<name>`, pushed with ORAS under the tag
@@ -26,8 +27,9 @@ changing anything about storage. In short:
   `size`, `sha256`, `tag`, `url`, `oci` (the per-file repository) and an optional `source`.
   `tag` and `url` are `null` until the file is released. A data change is a PR that edits
   it.
-- **Versions are bare SemVer tags** (`0.2.0`), each a Release holding every file in the
-  manifest. The proof of concept, `v0.1.0`, is the only tag with a leading `v`, and counts
+- **Versions are bare SemVer tags** (`0.2.0`), each a Release holding only the files new or
+  changed in that version. `releases/latest/download/<file>` therefore works only for files
+  changed in the newest Release. The proof of concept, `v0.1.0`, is the only tag with a leading `v`, and counts
   as `0.1.0`.
 
 ## Commands
@@ -37,7 +39,9 @@ changing anything about storage. In short:
 nothing. `/release-cord` (`.claude/skills/release-cord/`) then publishes them:
 
 - it asks for the SemVer bump;
-- it builds a draft Release and a `release-<version>` PR;
+- it builds a draft Release of the new and changed files, and a `release-<version>` PR that
+  also rewrites the `## CORDs` lists in `README.md` and the files' rows in `CORD_stats.xlsx`
+  (through `bin/get_cord_stats.py`);
 - it asks before merging;
 - it then tags `ghcr.io` and publishes the draft on the merge commit.
 
@@ -56,7 +60,12 @@ manifest. All three stop if only an old `jsonl/` directory exists; move it with
 for s in upload-senzing-ready release-cord download-senzing-ready; do
   python3 -m unittest discover -s .claude/skills/$s -p 'test_*.py'
 done
+python3 -m unittest discover -s bin -p 'test_*.py'   # skipped without openpyxl
 ```
+
+File names must be `<source>-<region>.jsonl`; `REGIONS` in `release_cord.py` maps each region
+to its README heading. The only Python dependency, `openpyxl`, is in `pyproject.toml`
+(`pip install .`).
 
 The document's "Proof of concept" section has the full publish and download commands for
 `v0.1.0`.

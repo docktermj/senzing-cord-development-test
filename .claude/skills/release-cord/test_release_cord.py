@@ -144,6 +144,34 @@ FAKE_ORAS = textwrap.dedent(
     """
 )
 
+# Stands in for bin/get_cord_stats.py: appends its arguments to the --stats file.
+FAKE_STATS = textwrap.dedent(
+    """\
+    import os, sys
+    args = sys.argv[1:]
+    with open(args[args.index("--stats") + 1], "a") as stats:
+        stats.write(" ".join(os.path.basename(a) for a in args) + "\\n")
+    """
+)
+
+README = textwrap.dedent(
+    """\
+    # repo
+
+    ## CORDs
+
+    Intro stays.
+
+    ### Old
+
+    - [old.jsonl](https://example.com/old.jsonl)
+
+    ## References
+
+    - kept
+    """
+)
+
 FILE_A = b'{"RECORD_ID": "1"}\n'
 FILE_B = b'{"RECORD_ID": "2"}\n{"RECORD_ID": "3"}\n'
 
@@ -189,21 +217,30 @@ class ReleaseTest(unittest.TestCase):
         patcher = mock.patch.dict(os.environ, env)
         patcher.start()
         self.addCleanup(patcher.stop)
+        stats_script = os.path.join(bin_dir, "get_cord_stats.py")
+        with open(stats_script, "w") as file:
+            file.write(FAKE_STATS)
+        for patcher in (mock.patch.object(release_cord, "STATS_SCRIPT", stats_script),
+                        mock.patch.object(release_cord, "openpyxl_available", lambda: True)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
-        # origin holds release v0.1.0 with a.jsonl; b.jsonl is uploaded, not released.
+        # origin holds release v0.1.0 with a-london.jsonl; b-london.jsonl is uploaded, not released.
         subprocess.run(["git", "init", "-q", "--bare", "-b", "main", self.origin], check=True)
         subprocess.run(["git", "clone", "-q", self.origin, self.root], check=True,
                        capture_output=True)
         self.write(".gitignore", "/senzing-ready\n")
-        self.write_manifest([self.entry("a.jsonl", FILE_A, "v0.1.0")])
+        self.write("README.md", README)
+        self.write("CORD_stats.xlsx", "stats\n")
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
         self.git("add", ".")
         self.git("commit", "-q", "-m", "initial")
         self.git("tag", "v0.1.0")
         self.git("push", "-q", "origin", "main", "v0.1.0")
-        self.seed_registry("a.jsonl", FILE_A)
-        self.seed_registry("b.jsonl", FILE_B)
+        self.seed_registry("a-london.jsonl", FILE_A)
+        self.seed_registry("b-london.jsonl", FILE_B)
         os.makedirs(os.path.join(self.root, "senzing-ready"))
-        with open(os.path.join(self.root, "senzing-ready", "b.jsonl"), "wb") as file:
+        with open(os.path.join(self.root, "senzing-ready", "b-london.jsonl"), "wb") as file:
             file.write(FILE_B)
         self.upload_b()
 
@@ -228,11 +265,11 @@ class ReleaseTest(unittest.TestCase):
         self.write("manifest.json", json.dumps({"files": entries}, indent=2) + "\n")
 
     def upload_b(self):
-        """The working-tree state /upload-senzing-ready leaves after adding b.jsonl."""
-        self.write_manifest([self.entry("a.jsonl", FILE_A, "v0.1.0"),
-                             self.entry("b.jsonl", FILE_B, None)])
+        """The working-tree state /upload-senzing-ready leaves after adding b-london.jsonl."""
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
+                             self.entry("b-london.jsonl", FILE_B, None)])
         self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
-                   + "\n## [Unreleased]\n\n### Added\n\n- `b.jsonl`\n")
+                   + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n")
 
     def seed_registry(self, name, data):
         ref = f"{REGISTRY}/{name}:sha256-{sha(data)}"
@@ -287,8 +324,8 @@ class ReleaseTest(unittest.TestCase):
 
     def test_released_changelog(self):
         text = (release_cord.upload.CHANGELOG_HEADER
-                + "\n## [Unreleased]\n\n### Added\n\n- `b.jsonl`\n\n"
-                "## [0.1.0] - 2026-10-27\n\n### Added\n\n- `a.jsonl`\n\n"
+                + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n\n"
+                "## [0.1.0] - 2026-10-27\n\n### Added\n\n- `a-london.jsonl`\n\n"
                 "[Unreleased]: https://github.com/Owner/Repo/compare/0.1.0...HEAD\n"
                 "[0.1.0]: https://github.com/Owner/Repo/releases/tag/0.1.0\n")
         result = release_cord.released_changelog(
@@ -300,13 +337,13 @@ class ReleaseTest(unittest.TestCase):
 
             ### Added
 
-            - `b.jsonl`
+            - `b-london.jsonl`
 
             ## [0.1.0] - 2026-10-27
 
             ### Added
 
-            - `a.jsonl`
+            - `a-london.jsonl`
 
             [Unreleased]: https://github.com/Owner/Repo/compare/0.2.0...HEAD
             [0.2.0]: https://github.com/Owner/Repo/compare/0.1.0...0.2.0
@@ -324,18 +361,18 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("next: prepare", output)
 
     def test_status_nothing_to_release(self):
-        self.write_manifest([self.entry("a.jsonl", FILE_A, "v0.1.0")])
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
         os.remove(os.path.join(self.root, "CHANGELOG.md"))
         code, output = self.release("status")
         self.assertEqual(code, 2)
         self.assertIn("nothing to release", output)
 
     def test_status_names_files_missing_from_ghcr(self):
-        os.remove(os.path.join(self.oras_state, f"{REGISTRY}/b.jsonl:sha256-{sha(FILE_B)}"
+        os.remove(os.path.join(self.oras_state, f"{REGISTRY}/b-london.jsonl:sha256-{sha(FILE_B)}"
                                .replace("/", "_").replace(":", "@")))
         code, output = self.release("status")
         self.assertEqual(code, 2)
-        self.assertIn("no ghcr.io sha256 tag for: b.jsonl", output)
+        self.assertIn("no ghcr.io sha256 tag for: b-london.jsonl", output)
 
     # --- prepare ---
 
@@ -351,17 +388,18 @@ class ReleaseTest(unittest.TestCase):
             f"#020---{TODAY})",
         )
         assets = os.path.join(self.gh_state, "assets", "0.2.0")
-        self.assertEqual(sorted(os.listdir(assets)), ["a.jsonl", "b.jsonl"])
-        with open(os.path.join(assets, "a.jsonl"), "rb") as file:
-            self.assertEqual(file.read(), FILE_A)  # fetched from ghcr.io
+        # Only the new file: a-london.jsonl is unchanged since v0.1.0.
+        self.assertEqual(os.listdir(assets), ["b-london.jsonl"])
 
         manifest = json.loads(self.origin_file("release-0.2.0", "manifest.json"))
-        for entry in manifest["files"]:
-            self.assertEqual(entry["tag"], "0.2.0")
-            self.assertEqual(entry["url"], "https://github.com/Owner/Repo/releases/download/"
-                             f"0.2.0/{entry['name']}")
+        urls = {e["name"]: (e["tag"], e["url"]) for e in manifest["files"]}
+        base = "https://github.com/Owner/Repo/releases/download"
+        self.assertEqual(urls, {
+            "a-london.jsonl": ("v0.1.0", f"{base}/v0.1.0/a-london.jsonl"),
+            "b-london.jsonl": ("0.2.0", f"{base}/0.2.0/b-london.jsonl"),
+        })
         changelog = self.origin_file("release-0.2.0", "CHANGELOG.md")
-        self.assertIn(f"## [Unreleased]\n\n## [0.2.0] - {TODAY}\n\n### Added\n\n- `b.jsonl`",
+        self.assertIn(f"## [Unreleased]\n\n## [0.2.0] - {TODAY}\n\n### Added\n\n- `b-london.jsonl`",
                       changelog)
         self.assertIn("[0.2.0]: https://github.com/Owner/Repo/compare/v0.1.0...0.2.0", changelog)
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
@@ -388,7 +426,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual([c for c in self.calls("gh") if c[:2] == ["release", "create"]], [])
 
     def test_prepare_resumes_a_partial_draft(self):
-        with mock.patch.dict(os.environ, {"FAKE_GH_FAIL_UPLOAD": "b.jsonl"}):
+        with mock.patch.dict(os.environ, {"FAKE_GH_FAIL_UPLOAD": "b-london.jsonl"}):
             code, _ = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         code, output = self.release("prepare")
@@ -397,10 +435,10 @@ class ReleaseTest(unittest.TestCase):
         uploads = [c for c in self.calls("gh") if c[:2] == ["release", "upload"]]
         self.assertEqual(len(uploads), 1)
         self.assertEqual([os.path.basename(a) for a in uploads[0] if a.endswith(".jsonl")],
-                         ["b.jsonl"])
+                         ["b-london.jsonl"])
         self.assertIn("--clobber", uploads[0])
-        self.assertEqual(sorted(os.listdir(os.path.join(self.gh_state, "assets", "0.2.0"))),
-                         ["a.jsonl", "b.jsonl"])
+        self.assertEqual(os.listdir(os.path.join(self.gh_state, "assets", "0.2.0")),
+                         ["b-london.jsonl"])
 
     def test_status_after_prepare_resumes_with_publish(self):
         self.release("prepare", "--bump", "minor")
@@ -408,6 +446,76 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("draft: 0.2.0 (resume)", output)
         self.assertIn("next: publish", output)
+
+    def test_prepare_rewrites_readme_by_region(self):
+        self.release("prepare", "--bump", "minor")
+        base = "https://github.com/Owner/Repo/releases/download"
+        self.assertEqual(self.origin_file("release-0.2.0", "README.md"), textwrap.dedent(f"""\
+            # repo
+
+            ## CORDs
+
+            Intro stays.
+
+            ### Las Vegas
+
+            Not published yet.
+
+            ### London
+
+            - [a-london.jsonl]({base}/v0.1.0/a-london.jsonl)
+            - [b-london.jsonl]({base}/0.2.0/b-london.jsonl)
+
+            ### Moscow
+
+            Not published yet.
+
+            ## References
+
+            - kept
+            """))
+
+    def test_prepare_updates_stats_for_added_and_changed_files(self):
+        # a-london.jsonl changed (tag null, listed under Changed); b-london.jsonl is new.
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, None),
+                             self.entry("b-london.jsonl", FILE_B, None)])
+        self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
+                   + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n"
+                   + "\n### Changed\n\n- `a-london.jsonl`\n")
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.origin_file("release-0.2.0", "CORD_stats.xlsx"), (
+            "stats\n"
+            f"--stats CORD_stats.xlsx --reason Added in 0.2.0 --date {TODAY} b-london.jsonl\n"
+            f"--stats CORD_stats.xlsx --reason Changed in 0.2.0 --date {TODAY} a-london.jsonl\n"
+        ))
+        self.assertEqual(sorted(os.listdir(os.path.join(self.gh_state, "assets", "0.2.0"))),
+                         ["a-london.jsonl", "b-london.jsonl"])
+
+    def test_prepare_stops_on_unmapped_region(self):
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
+                             self.entry("c-paris.jsonl", FILE_B, None)])
+        self.seed_registry("c-paris.jsonl", FILE_B)
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 2)
+        self.assertIn("region 'paris' has no README heading; add it to REGIONS", output)
+        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+
+    def test_prepare_stops_on_name_without_region(self):
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
+                             self.entry("bob.jsonl", FILE_B, None)])
+        self.seed_registry("bob.jsonl", FILE_B)
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 2)
+        self.assertIn("bob.jsonl: expected <source>-<region>.jsonl", output)
+        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+
+    def test_prepare_stops_without_openpyxl(self):
+        with mock.patch.object(release_cord, "openpyxl_available", lambda: False):
+            code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 2)
+        self.assertIn("pip install openpyxl", output)
+        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
 
     # --- publish ---
 
@@ -419,13 +527,15 @@ class ReleaseTest(unittest.TestCase):
         merge = self.gh_state_json()["prs"][0]["mergeCommit"]["oid"]
         tags = [c for c in self.calls("oras") if c[0] == "tag"]
         self.assertEqual(tags, [
-            ["tag", f"{REGISTRY}/a.jsonl:sha256-{sha(FILE_A)}", "0.2.0"],
-            ["tag", f"{REGISTRY}/b.jsonl:sha256-{sha(FILE_B)}", "0.2.0"],
+            ["tag", f"{REGISTRY}/a-london.jsonl:sha256-{sha(FILE_A)}", "0.2.0"],
+            ["tag", f"{REGISTRY}/b-london.jsonl:sha256-{sha(FILE_B)}", "0.2.0"],
         ])
         release = self.gh_state_json()["releases"]["0.2.0"]
         self.assertEqual((release["draft"], release["target"], release["latest"]),
                          (False, merge, True))
-        self.assertEqual(output.count("verified: "), 2)
+        self.assertEqual(output.count("verified: "), 1)
+        self.assertIn("verified: https://github.com/Owner/Repo/releases/download/0.2.0/"
+                      "b-london.jsonl", output)
         self.assertEqual(self.git("branch", "--show-current"), "main")
         self.assertEqual(self.git("rev-parse", "HEAD"), merge)
 
@@ -440,12 +550,12 @@ class ReleaseTest(unittest.TestCase):
 
     def test_publish_reports_a_mismatched_download(self):
         self.release("prepare", "--bump", "minor")
-        with open(os.path.join(self.gh_state, "assets", "0.2.0", "a.jsonl"), "wb") as file:
+        with open(os.path.join(self.gh_state, "assets", "0.2.0", "b-london.jsonl"), "wb") as file:
             file.write(b"tampered\n")
         code, output = self.release("publish")
         self.assertEqual(code, 1)
-        self.assertIn("MISMATCH: https://github.com/Owner/Repo/releases/download/0.2.0/a.jsonl",
-                      output)
+        self.assertIn("MISMATCH: https://github.com/Owner/Repo/releases/download/0.2.0/"
+                      "b-london.jsonl", output)
 
     def test_publish_without_draft_stops(self):
         code, output = self.release("publish")
