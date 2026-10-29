@@ -1,5 +1,42 @@
 # senzing-cord-development-test
 
+A test copy of [senzing-garage/cord-development](https://github.com/senzing-garage/cord-development),
+used to work out how to publish the Senzing Collections of Relatable Data (CORD).
+
+The data files are not stored in git. Each version is a
+[GitHub Release](https://github.com/docktermj/senzing-cord-development-test/releases) holding
+every file, and [`manifest.json`](manifest.json) lists each file's size, SHA-256 and download
+URL. [`CHANGELOG.md`](CHANGELOG.md) says what changed in each version.
+
+## CORDs
+
+Each link below always serves the file from the newest Release. To pin a version, use
+`releases/download/<version>/<file>` instead, for example
+`https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/gleif-london.jsonl`.
+
+### Las Vegas
+
+Not published yet.
+
+### London
+
+- [gleif-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/latest/download/gleif-london.jsonl)
+- [ofac-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/latest/download/ofac-london.jsonl)
+
+### Moscow
+
+Not published yet.
+
+## Download
+
+```bash
+curl -fsSLO https://github.com/docktermj/senzing-cord-development-test/releases/latest/download/gleif-london.jsonl
+sha256sum gleif-london.jsonl   # compare with the sha256 in manifest.json
+```
+
+In a clone, `/download-senzing-ready` in Claude Code downloads every file in `manifest.json` into
+`senzing-ready/` and checks each SHA-256.
+
 ## References
 
 - [JSONL file download approach](docs/publishing-approach.md): how this repository publishes the CORD JSONL files, and why.
