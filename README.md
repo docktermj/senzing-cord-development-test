@@ -43,6 +43,24 @@ sha256sum gleif-london.jsonl   # compare with the sha256 in manifest.json
 In a clone, `/download-senzing-ready` in Claude Code downloads every file in `manifest.json` into
 `senzing-ready/` and checks each SHA-256.
 
+## How to publish CORDs
+
+You need write access to this repository. Without it, open an issue instead.
+
+1. Clone the repository, then run `gh auth login` and `pip install .`.
+2. In Claude Code, run `/download-senzing-ready` to fill `senzing-ready/` with the current files.
+3. Add a new file to `senzing-ready/`, or replace an existing one. Name it
+   `<source>-<region>.jsonl`, such as `gleif-london.jsonl`.
+   - A new region first needs an entry in `REGIONS` in
+     `.claude/skills/upload-senzing-ready/upload_senzing_ready.py`.
+   - To remove a file, run `/upload-senzing-ready --remove <name>` instead.
+4. Run `/publish-cord`. It uploads the new and changed files, asks which part of the version to
+   bump, and opens a `release-<version>` pull request. Approve the merge when it asks, and it
+   publishes the Release.
+
+[JSONL file download approach](docs/publishing-approach.md#current-workflow) explains each step
+and why the files are published this way.
+
 ## References
 
 - [JSONL file download approach](docs/publishing-approach.md): how this repository publishes the CORD JSONL files, and why.

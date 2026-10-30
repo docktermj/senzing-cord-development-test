@@ -21,6 +21,25 @@ The reasons are in [Why this approach](#why-this-approach). Each file was at fir
 published to `ghcr.io` (approach 4); [Dropping `ghcr.io`](#dropping-ghcrio) says why that
 stopped.
 
+## Current workflow
+
+A writer to this repository, in Claude Code:
+
+1. **`/download-senzing-ready`** fills the gitignored `senzing-ready/` directory from
+   `manifest.json`, checking each file's SHA-256.
+2. Add or edit `senzing-ready/<source>-<region>.jsonl`.
+3. **`/upload-senzing-ready`** uploads the new and changed files to the `unreleased` draft
+   Release, and records them in `manifest.json` (with `tag` and `url` still `null`) and the
+   `[Unreleased]` section of `CHANGELOG.md`. It refuses a file whose region isn't in
+   `REGIONS`, and `--remove <name>` takes a file out of the manifest.
+4. **`/publish-cord`** runs that upload itself, asks for the SemVer bump, renames the draft to
+   the new version, and opens a `release-<version>` pull request that updates `manifest.json`,
+   `CHANGELOG.md`, the `## CORDs` lists in `README.md` and `CORD_stats.xlsx`. After the user
+   approves the merge, it publishes the Release on the merge commit.
+5. **`check-releases.yml`** runs `download_senzing_ready.py --verify` weekly. It fails if a
+   released file's asset `digest`, or its senzing.com copy, no longer matches the manifest's
+   `sha256`.
+
 ## Context
 
 The [CORD page] links 21 JSONL files, all served from `https://senzing.com/datasets/`. The
@@ -92,18 +111,19 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 - **URL:** yes.
   `https://github.com/<owner>/<repo>/releases/download/<tag>/<file>` redirects to GitHub's asset
   host, so `curl -fsSL` (which follows redirects) downloads it with no authentication. The URL
-  stays stable as long as the Release and its tag are kept. `releases/latest/download/<file>`
-  also gives a URL that always serves the newest Release's copy.
+  stays stable as long as the Release and its tag are kept. Each Release holds only the files
+  new or changed in it, so `releases/latest/download/<file>` works only for files changed in
+  the newest Release; the manifest's `url` is the link that always works.
 - **Capacity:** yes, without splitting. "Each file included in a release must be under 2 GiB",
   and `opendata-lasvegas.jsonl` is about half that. A Release can hold up to 1000 assets, and
   "there is no limit on the total size of a release, nor bandwidth usage."
 - **PR diff:** no. The pull request shows the manifest's new size and SHA-256, not the records.
 - **Checkout:** no. Only the manifest is in the tree.
 - **History:** no. Git stores only manifest edits.
-- **Files over 100 MiB:** the contributor opens a pull request that edits the manifest. A
-  maintainer with write access attaches the file with `gh release upload` or a new
-  `gh release create`. A way for contributors without write access to hand over such a file
-  is a follow-up issue.
+- **Files over 100 MiB:** no different from any other file. A writer puts it in
+  `senzing-ready/` and runs `/upload-senzing-ready` and then `/publish-cord`, as in
+  [Current workflow](#current-workflow); the pull request edits only the manifest. A way for
+  contributors without write access to hand over such a file is a follow-up issue.
 
 ### 4. Manifest in git, files in `ghcr.io` as OCI artifacts
 
@@ -198,7 +218,10 @@ and `write:packages` requirements, and the open question of making the package p
 consumer depended on it. The existing packages are kept as history, and the manifest no
 longer has an `oci` field.
 
-## Proof of concept
+## Proof of concept (history)
+
+The `oras` and `ghcr.io` steps below no longer apply; see [Dropping `ghcr.io`](#dropping-ghcrio)
+and [Current workflow](#current-workflow).
 
 `gleif-london.jsonl` (45,162,274 bytes, under the 100 MiB limit) is published in this repository
 under the version tag `v0.1.0`. This records how the proof of concept was published, including
@@ -264,16 +287,14 @@ oras blob fetch --output - ghcr.io/docktermj/senzing-cord-development-test@sha25
 | Release asset `v0.1.0` | Yes | 2026-10-27 |
 | `ghcr.io` blob | Yes | 2026-10-27 |
 
-The `ghcr.io` package `senzing-cord-development-test` is linked to this repository and is
-private. Making it public is a separate, one-way decision.
+The `ghcr.io` package `senzing-cord-development-test` is linked to this repository, private,
+and kept as history.
 
 ## Later improvements
 
 - Turn on GitHub's immutable releases, so that once a Release is published its tag can't be
   moved and its assets can't be modified or deleted. That makes every Release asset URL in the
   manifest permanent.
-- When a new version leaves a file unchanged, keep its manifest entry's `tag` at the Release
-  that first published it, instead of uploading the same bytes again.
 - If shards in git are ever revisited, assign records to shards by a hash of `RECORD_ID`
   instead of by position. An insertion would then change one shard rather than every later
   one.
@@ -281,8 +302,6 @@ private. Making it public is a separate, one-way decision.
 Follow-up issues cover the rest:
 
 - moving the other 19 files and changing the [CORD page] links;
-- a CI check that published files match the manifest;
-- a scheduled check that every published URL still serves its file;
 - a Pages catalog generated from the manifest;
 - a way for contributors to submit a file too large for a pull request.
 
