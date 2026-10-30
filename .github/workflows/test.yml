@@ -1,0 +1,39 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the minimum in pyproject.toml; 3.12 is the version used locally.
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: python3 -m pip install .
+
+      - name: Skill tests
+        run: |
+          for s in upload-senzing-ready publish-cord download-senzing-ready; do
+            python3 -m unittest discover -s .claude/skills/$s -p 'test_*.py'
+          done
+
+      - name: bin tests
+        run: |
+          # The bin tests skip without openpyxl; fail instead, so they always run here.
+          python3 -c 'import openpyxl'
+          python3 -m unittest discover -s bin -p 'test_*.py'
