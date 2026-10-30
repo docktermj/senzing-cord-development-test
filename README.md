@@ -16,6 +16,7 @@ Each link below serves the version of the file in `manifest.json`, from the Rele
 last changed. There is one list per heading: each file goes under the heading of its region,
 the part of the file name after the last hyphen, and regions that share a heading (`london`
 and `london_central_a`) share one list. `/publish-cord` rewrites these lists on every release.
+The [CORD catalog](docs/cords.md) lists each released file's version, size and SHA-256.
 
 ### Las Vegas
 
