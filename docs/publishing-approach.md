@@ -1,4 +1,4 @@
-# JSONL file download approach
+# CORD publishing approach
 
 Decision record for [issue #1](https://github.com/docktermj/senzing-cord-development-test/issues/1),
 copied from senzing-garage/cord-development#4.

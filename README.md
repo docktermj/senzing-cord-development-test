@@ -58,9 +58,9 @@ You need write access to this repository. Without it, open an issue instead.
    bump, and opens a `release-<version>` pull request. Approve the merge when it asks, and it
    publishes the Release.
 
-[JSONL file download approach](docs/publishing-approach.md#current-workflow) explains each step
+[CORD publishing approach](docs/publishing-approach.md#current-workflow) explains each step
 and why the files are published this way.
 
 ## References
 
-- [JSONL file download approach](docs/publishing-approach.md): how this repository publishes the CORD JSONL files, and why.
+- [CORD publishing approach](docs/publishing-approach.md): how this repository publishes the CORD JSONL files, and why.
