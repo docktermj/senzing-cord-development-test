@@ -1,7 +1,7 @@
 ---
 name: download-senzing-ready
-description: Download every CORD JSONL file listed in manifest.json into the local senzing-ready/ directory, checking each SHA-256 and keeping locally modified files. Use when the user runs /download-senzing-ready, or asks to fetch, sync or get the JSONL data files locally. Writes only to the gitignored senzing-ready/ directory.
-argument-hint: "[--force <name>]..."
+description: Download every CORD JSONL file listed in manifest.json into the local senzing-ready/ directory, checking each SHA-256 and keeping locally modified files. With --verify, it instead checks the released files where they are published (Release asset digests, and the senzing.com copy where there is one) without writing anything. Use when the user runs /download-senzing-ready, asks to fetch, sync or get the JSONL data files locally, or asks to verify or check the released files against manifest.json. Writes only to the gitignored senzing-ready/ directory.
+argument-hint: "[--force <name>]... | --verify"
 ---
 
 Bring `senzing-ready/` in line with `manifest.json`. The script `download_senzing_ready.py` next to this file
@@ -34,6 +34,9 @@ does the work; this skill runs it and reports.
      - For an **unreleased file that failed**, show the printed fix, usually `gh auth login`.
    - **Exit 2:** the run stopped before downloading anything. Show the message.
 
+   With `--verify`, report the `verified`, `unreleased, not checked` and `failed` lines
+   instead (see [Verify mode](#verify-mode)). Don't try to fix a failure; report it.
+
 ## What the script does
 
 For each manifest entry, in name order:
@@ -54,6 +57,30 @@ Each download goes to `senzing-ready/.<name>.part`, is checked against the manif
 renamed into place only if it matches. A failed or interrupted download leaves no partial
 file, and the remaining entries still download. Files in `senzing-ready/` that aren't in the manifest
 are left alone. `--force` with a name that isn't in the manifest stops the run.
+
+## Verify mode
+
+`--verify` checks the published copies instead of downloading into `senzing-ready/`. It
+writes nothing there, ignores local files, and doesn't stop for an old `jsonl/` directory.
+The `check-releases` GitHub Actions workflow runs it weekly and on demand.
+
+```bash
+python3 .claude/skills/download-senzing-ready/download_senzing_ready.py --verify
+```
+
+For each manifest entry with a `url`:
+
+- The Release asset's `digest` from `gh release view <tag> --json isDraft,assets` must equal
+  `sha256:<sha256>`. The asset isn't downloaded. A missing or draft Release, a missing asset
+  and an asset with no digest each fail the entry. `gh` is called once per Release.
+- When `source` is set, the file is downloaded from it with `curl -fsSL` into a temporary
+  directory, hashed, compared and deleted. A 404 or a different SHA-256 fails the entry.
+  An entry with `"source": null` is checked only against its Release asset.
+
+Unreleased entries (`url` is `null`) are listed as `unreleased, not checked`. Each result is a
+`verified: <name>: <url>` or `failed: <name>: <url>: <reason>` line naming the file and where
+it was checked. Exit 0 means every check passed, 1 that some failed, and 2 that the run stopped
+(no `manifest.json`). `--force` can't be combined with `--verify`.
 
 ## Tests
 
