@@ -158,12 +158,9 @@ def verify(root, out=None):
                     ok.append(f"{name}: {url}")
             if source:
                 print(f"downloading {source}", file=out, flush=True)
-                target = os.path.join(scratch, name)
-                error = fetch(root, {"url": source}, target)
-                if error is None and upload.sha256_and_size(target)[0] != entry["sha256"]:
+                found, error = upload.curl_sha256(source, os.path.join(scratch, name))
+                if error is None and found != entry["sha256"]:
                     error = "SHA-256 does not match manifest.json"
-                if os.path.exists(target):
-                    os.remove(target)
                 if error is None:
                     ok.append(f"{name}: {source}")
                 else:

@@ -29,6 +29,11 @@ changing anything about storage. In short:
   `size`, `sha256`, `tag`, `url` and an optional `source`.
   `tag` and `url` are `null` until the file is released. A data change is a PR that edits
   it.
+- **`source` is the file's senzing.com URL when that copy has the same SHA-256.**
+  `/upload-senzing-ready` sets it for each added or changed file: it compares the `Content-Length`
+  of `https://senzing.com/datasets/<name>` with the file's size, and downloads and hashes the copy
+  only when they match. `source` is `null` after a 404 or a mismatch; any other failure
+  stops the run before anything is uploaded. A repaired file keeps its `source`.
 - **Versions are bare SemVer tags** (`0.2.0`), each a Release holding only the files new or
   changed in that version. `releases/latest/download/<file>` therefore works only for files
   changed in the newest Release. The proof of concept, `v0.1.0`, is the only tag with a leading `v`, and counts

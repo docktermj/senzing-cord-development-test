@@ -13,14 +13,16 @@
       "size": 102967,
       "sha256": "2299bcaf6b9111fed771b3c54a56685f5239f75c57c47d322020f742c21eb40b",
       "tag": "0.1.1",
-      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl"
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl",
+      "source": "https://senzing.com/datasets/ofac-london.jsonl"
     },
     {
       "name": "opendata-lasvegas.jsonl",
       "size": 980688237,
       "sha256": "eed5ff8d46bea3ad24bf369541f35339968e646ea3b8af2ce3c02146ffae56b7",
       "tag": "0.1.2",
-      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl"
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl",
+      "source": "https://senzing.com/datasets/opendata-lasvegas.jsonl"
     },
     {
       "name": "opendata2-lasvegas.jsonl",
@@ -48,7 +50,8 @@
       "size": 1053930,
       "sha256": "160a12a46d426ba03f9bfeb629b9bf206fcbd58131fc8e106d796aa68d337080",
       "tag": "0.1.5",
-      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl"
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl",
+      "source": "https://senzing.com/datasets/us_labor_violations-lasvegas.jsonl"
     }
   ]
 }
