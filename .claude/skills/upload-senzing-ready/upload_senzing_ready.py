@@ -29,8 +29,8 @@ STAGING = "unreleased"
 STAGING_NOTES = "Files uploaded by /upload-senzing-ready, waiting for the next release."
 MAX_SIZE = 2 * 1024**3  # GitHub Release asset limit
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.jsonl$")
-# README.md heading for each region, the part of a file name after the last hyphen.
-# /publish-cord groups the README file lists by these; regions may share a heading.
+# docs/cords.md heading for each region, the part of a file name after the last hyphen.
+# /publish-cord groups the catalog by these; regions may share a heading.
 REGIONS = {
     "lasvegas": "Las Vegas",
     "london": "London",
@@ -106,7 +106,7 @@ def region_error(name):
     if not source or not region:
         return f"{name}: expected <source>-<region>.jsonl"
     if region not in REGIONS:
-        return (f"{name}: region {region!r} has no README heading; add it to REGIONS in "
+        return (f"{name}: region {region!r} has no catalog heading; add it to REGIONS in "
                 "upload_senzing_ready.py")
     return None
 

@@ -12,28 +12,8 @@ each file's size, SHA-256 and download URL: the Release where it last changed.
 
 ## CORDs
 
-Each link below serves the version of the file in `manifest.json`, from the Release where it
-last changed. There is one list per heading: each file goes under the heading of its region,
-the part of the file name after the last hyphen, and regions that share a heading (`london`
-and `london_central_a`) share one list. `/publish-cord` rewrites these lists on every release.
-The [CORD catalog](docs/cords.md) lists each released file's version, size and SHA-256.
-
-### Las Vegas
-
-- [opendata-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl)
-- [opendata2-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.4/opendata2-lasvegas.jsonl)
-- [opendata3-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.6/opendata3-lasvegas.jsonl)
-- [opendata4-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.7/opendata4-lasvegas.jsonl)
-- [us_labor_violations-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl)
-
-### London
-
-- [gleif-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/gleif-london.jsonl)
-- [ofac-london.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl)
-
-### Moscow
-
-Not published yet.
+The [CORD catalog](docs/cords.md) lists every released file with its version, size, SHA-256
+and download link, one table per region. `/publish-cord` rewrites it on every release.
 
 ## Download
 
@@ -51,7 +31,9 @@ You need write access to this repository. Without it, see
 [Submit a CORD without write access](#submit-a-cord-without-write-access).
 
 1. Clone the repository, then run `gh auth login` and `pip install .`.
-2. In Claude Code, run `/download-senzing-ready` to fill `senzing-ready/` with the current files.
+2. Optional: in Claude Code, run `/download-senzing-ready` to fill `senzing-ready/` with the
+   current files. Uploads look only at the files in `senzing-ready/`, so you need just the
+   ones you add or replace.
 3. Add a new file to `senzing-ready/`, or replace an existing one. Name it
    `<source>-<region>.jsonl`, such as `gleif-london.jsonl`.
    - A new region first needs an entry in `REGIONS` in

@@ -148,23 +148,7 @@ FAKE_STATS = textwrap.dedent(
     """
 )
 
-README = textwrap.dedent(
-    """\
-    # repo
-
-    ## CORDs
-
-    Intro stays.
-
-    ### Old
-
-    - [old.jsonl](https://example.com/old.jsonl)
-
-    ## References
-
-    - kept
-    """
-)
+README = "# repo\n\nNo CORDs section, which publish_cord.py never reads.\n"
 
 FILE_A = b'{"RECORD_ID": "1"}\n'
 FILE_B = b'{"RECORD_ID": "2"}\n{"RECORD_ID": "3"}\n'
@@ -324,62 +308,6 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(publish_cord.suggest_bump({"Removed": ["x"], "Added": ["y"]}), "major")
         self.assertEqual(publish_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
         self.assertEqual(publish_cord.suggest_bump({"Changed": ["z"]}), "patch")
-
-    def test_readme_merges_regions_that_share_a_heading(self):
-        entries = [{"name": name, "url": f"https://example.com/{name}"} for name in (
-            "c-london.jsonl", "globaldata-london_central_a.jsonl", "a-london_central_a.jsonl",
-            "b-london.jsonl")]
-        result = publish_cord.readme_cords(README, entries)
-        self.assertEqual(result.count("### London"), 1)
-        self.assertEqual(result, textwrap.dedent("""\
-            # repo
-
-            ## CORDs
-
-            Intro stays.
-
-            ### Las Vegas
-
-            Not published yet.
-
-            ### London
-
-            - [a-london_central_a.jsonl](https://example.com/a-london_central_a.jsonl)
-            - [b-london.jsonl](https://example.com/b-london.jsonl)
-            - [c-london.jsonl](https://example.com/c-london.jsonl)
-            - [globaldata-london_central_a.jsonl](https://example.com/globaldata-london_central_a.jsonl)
-
-            ### Moscow
-
-            Not published yet.
-
-            ## References
-
-            - kept
-            """))
-
-    def test_readme_heading_without_files_says_not_published_once(self):
-        entries = [{"name": "a-london_central_a.jsonl", "url": "https://example.com/a"}]
-        result = publish_cord.readme_cords(README, entries)
-        self.assertEqual(result.count("### London"), 1)
-        self.assertIn("### London\n\n- [a-london_central_a.jsonl](https://example.com/a)\n\n"
-                      "### Moscow", result)
-        self.assertEqual(result.count("Not published yet."), 2)  # Las Vegas and Moscow
-        self.assertIn("### Las Vegas\n\nNot published yet.\n\n### London", result)
-        self.assertIn("### Moscow\n\nNot published yet.\n\n## References", result)
-
-    def test_readme_for_the_current_manifest_is_unchanged(self):
-        root = os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))))
-        readme = read(os.path.join(root, "README.md"))
-        entries = json.loads(read(os.path.join(root, "manifest.json")))["files"]
-        self.assertEqual(publish_cord.readme_cords(readme, entries), readme)
-
-    def test_readme_keeps_the_catalog_link(self):
-        root = os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))))
-        readme = read(os.path.join(root, "README.md"))
-        self.assertIn("[CORD catalog](docs/cords.md)", publish_cord.readme_cords(readme, []))
 
     def test_catalog_lists_released_files_by_heading(self):
         base = "https://example.com"
@@ -560,7 +488,7 @@ class ReleaseTest(unittest.TestCase):
         self.write_manifest([self.entry("c-paris.jsonl", FILE_B, None)])
         code, output = self.release("catalog")
         self.assertEqual(code, 2)
-        self.assertIn("region 'paris' has no README heading", output)
+        self.assertIn("region 'paris' has no catalog heading", output)
         self.assertFalse(os.path.exists(os.path.join(self.root, "docs", "cords.md")))
 
     # --- status ---
@@ -636,7 +564,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("[0.2.0]: https://github.com/Owner/Repo/compare/v0.1.0...0.2.0", changelog)
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
         create = next(c for c in self.calls() if c[:2] == ["pr", "create"])
-        self.assertIn("`README.md`, `docs/cords.md` and `CORD_stats.xlsx`",
+        self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `docs/cords.md` and "
+                      "`CORD_stats.xlsx`.",
                       create[create.index("--body") + 1])
 
     def test_prepare_requires_bump(self):
@@ -697,33 +626,13 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("draft: 0.2.0 (resume)", output)
         self.assertIn("next: publish", output)
 
-    def test_prepare_rewrites_readme_by_region(self):
-        self.release("prepare", "--bump", "minor")
-        base = "https://github.com/Owner/Repo/releases/download"
-        self.assertEqual(self.origin_file("release-0.2.0", "README.md"), textwrap.dedent(f"""\
-            # repo
-
-            ## CORDs
-
-            Intro stays.
-
-            ### Las Vegas
-
-            Not published yet.
-
-            ### London
-
-            - [a-london.jsonl]({base}/v0.1.0/a-london.jsonl)
-            - [b-london.jsonl]({base}/0.2.0/b-london.jsonl)
-
-            ### Moscow
-
-            Not published yet.
-
-            ## References
-
-            - kept
-            """))
+    def test_prepare_leaves_readme_alone(self):
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.origin_file("release-0.2.0", "README.md"), README)
+        changed = self.git("diff", "--name-only", "main", "release-0.2.0").split()
+        self.assertEqual(sorted(changed),
+                         ["CHANGELOG.md", "CORD_stats.xlsx", "docs/cords.md", "manifest.json"])
 
     def test_prepare_writes_the_catalog(self):
         code, output = self.release("prepare", "--bump", "minor")
@@ -760,7 +669,7 @@ class ReleaseTest(unittest.TestCase):
         self.stage("c-paris.jsonl", FILE_B)
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
-        self.assertIn("region 'paris' has no README heading; add it to REGIONS in "
+        self.assertIn("region 'paris' has no catalog heading; add it to REGIONS in "
                       "upload_senzing_ready.py", output)
         self.assertNoVersionDraft()
 
