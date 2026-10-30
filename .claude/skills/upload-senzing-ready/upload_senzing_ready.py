@@ -2,7 +2,7 @@
 """Upload new and changed senzing-ready/*.jsonl files and record them.
 
 Each file is staged as an asset of the draft Release tagged "unreleased", which
-/release-cord turns into the next version's draft. manifest.json and the
+/publish-cord turns into the next version's draft. manifest.json and the
 [Unreleased] section of CHANGELOG.md are updated in the working tree; nothing is
 committed.
 
@@ -18,13 +18,13 @@ import re
 import subprocess
 import sys
 
-# The draft Release that holds uploaded files until /release-cord releases them.
+# The draft Release that holds uploaded files until /publish-cord releases them.
 STAGING = "unreleased"
 STAGING_NOTES = "Files uploaded by /upload-senzing-ready, waiting for the next release."
 MAX_SIZE = 2 * 1024**3  # GitHub Release asset limit
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.jsonl$")
 # README.md heading for each region, the part of a file name after the last hyphen.
-# /release-cord groups the README file lists by these.
+# /publish-cord groups the README file lists by these.
 REGIONS = {
     "lasvegas": "Las Vegas",
     "london": "London",
