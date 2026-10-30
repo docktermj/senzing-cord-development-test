@@ -363,6 +363,14 @@ class UploadTest(unittest.TestCase):
                       "add it to REGIONS in upload_senzing_ready.py", output)
         self.assertEqual(len(self.uploads()), 1)
 
+    def test_region_that_shares_a_heading_is_accepted(self):
+        self.write_jsonl("globaldata-london_central_a.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(list(self.manifest()), ["globaldata-london_central_a.jsonl"])
+        self.assertEqual(len(self.uploads()), 1)
+        self.assertNotIn("refused", output)
+
     def test_oversized_file_is_refused(self):
         self.write_jsonl("a-london.jsonl", LINES_A)
         with mock.patch.object(upload_senzing_ready, "MAX_SIZE", 10):
