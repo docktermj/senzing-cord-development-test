@@ -40,6 +40,33 @@ A writer to this repository, in Claude Code:
    released file's asset `digest`, or its senzing.com copy, no longer matches the manifest's
    `sha256`.
 
+### A submission from a contributor without write access
+
+A contributor without write access opens a **Submit a CORD file** issue, from
+`.github/ISSUE_TEMPLATE/submit-cord.yml`. It gives the file name, a public download URL, the
+size in bytes and the SHA-256. The README's
+[Submit a CORD without write access](../README.md#submit-a-cord-without-write-access) has the
+contributor's steps. A writer, in a clone:
+
+1. **Downloads** the file: `curl -fsSL -o senzing-ready/<name> <url>`.
+2. **Checks** that `stat -c %s senzing-ready/<name>` and `sha256sum senzing-ready/<name>` print
+   the size and SHA-256 in the issue.
+3. **Runs `/publish-cord`**, whose upload step applies the upload checks: a
+   `<source>-<region>.jsonl` name, a region in `REGIONS`, at most 2 GiB, and every line valid
+   JSON.
+4. **Closes the issue** with a link to the Release.
+
+If the download fails, the size or SHA-256 doesn't match, or the upload refuses the file, the
+writer publishes nothing and says why in a comment on the issue. The contributor then posts a
+corrected link or values. `/publish-cord` stops on any refused file, and a new region needs a
+writer to add it to `REGIONS` first. A replacement for an existing file is handled the same way
+as a new one: the upload treats a changed SHA-256 as a change.
+
+The contributor's URL is not recorded as the manifest's `source`. `check-releases.yml`
+re-downloads every `source` weekly, and would fail once the contributor removed their copy. The
+URL stays only in the issue. The published Release asset is the only copy that matters, so the
+contributor can delete theirs once the issue is closed.
+
 ## Context
 
 The [CORD page] links 21 JSONL files, all served from `https://senzing.com/datasets/`. The
@@ -122,8 +149,9 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 - **History:** no. Git stores only manifest edits.
 - **Files over 100 MiB:** no different from any other file. A writer puts it in
   `senzing-ready/` and runs `/upload-senzing-ready` and then `/publish-cord`, as in
-  [Current workflow](#current-workflow); the pull request edits only the manifest. A way for
-  contributors without write access to hand over such a file is a follow-up issue.
+  [Current workflow](#current-workflow); the pull request edits only the manifest. A
+  contributor without write access hosts the file and opens an issue, as in
+  [A submission from a contributor without write access](#a-submission-from-a-contributor-without-write-access).
 
 ### 4. Manifest in git, files in `ghcr.io` as OCI artifacts
 
@@ -304,9 +332,7 @@ Follow-up issues cover the rest:
 - [#42](https://github.com/docktermj/senzing-cord-development-test/issues/42): moving the rest of
   the 21 files and changing the [CORD page] links;
 - [#43](https://github.com/docktermj/senzing-cord-development-test/issues/43): a Pages
-  catalog generated from the manifest;
-- [#44](https://github.com/docktermj/senzing-cord-development-test/issues/44): a way for
-  contributors without write access to submit a file.
+  catalog generated from the manifest.
 
 ## Appendix: the 21 files
 
