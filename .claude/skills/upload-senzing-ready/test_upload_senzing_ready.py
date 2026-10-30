@@ -411,7 +411,7 @@ class UploadTest(FakeToolsTest):
         self.assertEqual(code, 1)
         self.assertEqual(list(self.manifest()), ["open-sanctions-london.jsonl"])
         self.assertIn("refused: bob.jsonl: expected <source>-<region>.jsonl", output)
-        self.assertIn("refused: x-paris.jsonl: region 'paris' has no README heading; "
+        self.assertIn("refused: x-paris.jsonl: region 'paris' has no catalog heading; "
                       "add it to REGIONS in upload_senzing_ready.py", output)
         self.assertEqual(len(self.uploads()), 1)
 

@@ -34,7 +34,7 @@ A writer to this repository, in Claude Code:
    `REGIONS`, and `--remove <name>` takes a file out of the manifest.
 4. **`/publish-cord`** runs that upload itself, asks for the SemVer bump, renames the draft to
    the new version, and opens a `release-<version>` pull request that updates `manifest.json`,
-   `CHANGELOG.md`, the `## CORDs` lists in `README.md`, the catalog `docs/cords.md` and
+   `CHANGELOG.md`, the catalog `docs/cords.md` (which README links to) and
    `CORD_stats.xlsx`. After the user approves the merge, it publishes the Release on the merge
    commit.
 5. **`check-releases.yml`** runs `download_senzing_ready.py --verify` weekly. It fails if a

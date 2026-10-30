@@ -49,8 +49,9 @@ nothing. `/publish-cord` (`.claude/skills/publish-cord/`) publishes them:
   on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
 - it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
-  also rewrites the `## CORDs` lists in `README.md`, the catalog `docs/cords.md` and the files'
-  rows in `CORD_stats.xlsx` (through `bin/get_cord_stats.py`);
+  also rewrites the catalog `docs/cords.md` and the files' rows in `CORD_stats.xlsx`
+  (through `bin/get_cord_stats.py`); it never changes `README.md`, whose `## CORDs` section
+  links to the catalog;
 - it asks before merging;
 - it then publishes the draft on the merge commit.
 
@@ -89,7 +90,7 @@ than skipping the `bin` tests. A separate `markdownlint` job runs the lint comma
 `markdownlint-cli` 0.48.0, so any lint error fails CI.
 
 File names must be `<source>-<region>.jsonl`; `REGIONS` in `upload_senzing_ready.py` maps each
-region to its README heading. `/upload-senzing-ready` refuses other names, and `/publish-cord`
+region to its catalog heading. `/upload-senzing-ready` refuses other names, and `/publish-cord`
 applies the same check. The only Python dependency, `openpyxl`, is in `pyproject.toml`
 (`pip install .`).
 
