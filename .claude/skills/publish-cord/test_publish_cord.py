@@ -1,7 +1,7 @@
-"""Tests for release_cord.py, run against fake gh and curl executables.
+"""Tests for publish_cord.py, run against fake gh and curl executables.
 
 A real bare git repository stands in for origin. Run with:
-  python3 -m unittest discover -s .claude/skills/release-cord -p 'test_*.py'
+  python3 -m unittest discover -s .claude/skills/publish-cord -p 'test_*.py'
 """
 
 import datetime
@@ -19,9 +19,9 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import release_cord  # noqa: E402
+import publish_cord  # noqa: E402
 
-STAGING = release_cord.upload.STAGING
+STAGING = publish_cord.upload.STAGING
 
 # Releases and pull requests live in $FAKE_GH_STATE; a merge is a real
 # merge commit pushed to the bare repository at $FAKE_ORIGIN.
@@ -209,8 +209,8 @@ class ReleaseTest(unittest.TestCase):
         stats_script = os.path.join(bin_dir, "get_cord_stats.py")
         with open(stats_script, "w") as file:
             file.write(FAKE_STATS)
-        for patcher in (mock.patch.object(release_cord, "STATS_SCRIPT", stats_script),
-                        mock.patch.object(release_cord, "openpyxl_available", lambda: True)):
+        for patcher in (mock.patch.object(publish_cord, "STATS_SCRIPT", stats_script),
+                        mock.patch.object(publish_cord, "openpyxl_available", lambda: True)):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -255,7 +255,7 @@ class ReleaseTest(unittest.TestCase):
         """The working-tree state /upload-senzing-ready leaves after adding b-london.jsonl."""
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
                              self.entry("b-london.jsonl", FILE_B, None)])
-        self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
+        self.write("CHANGELOG.md", publish_cord.upload.CHANGELOG_HEADER
                    + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n")
 
     def stage(self, name, data):
@@ -287,7 +287,7 @@ class ReleaseTest(unittest.TestCase):
     def release(self, *args):
         out, err = io.StringIO(), io.StringIO()
         with mock.patch("sys.stdout", out), mock.patch("sys.stderr", err):
-            code = release_cord.main(["--root", self.root, "--repo", "Owner/Repo", *args])
+            code = publish_cord.main(["--root", self.root, "--repo", "Owner/Repo", *args])
         return code, out.getvalue() + err.getvalue()
 
     def origin_file(self, ref, name):
@@ -304,32 +304,32 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def test_versions(self):
-        self.assertEqual(release_cord.parse_version("v0.1.0"), (0, 1, 0))
-        self.assertEqual(release_cord.parse_version("1.20.3"), (1, 20, 3))
-        self.assertIsNone(release_cord.parse_version("1.2.3-rc.1"))
-        self.assertIsNone(release_cord.parse_version("01.2.3"))
-        self.assertEqual(release_cord.bumped((0, 1, 0), "major"), (1, 0, 0))
-        self.assertEqual(release_cord.bumped((0, 1, 4), "minor"), (0, 2, 0))
-        self.assertEqual(release_cord.bumped((0, 1, 4), "patch"), (0, 1, 5))
-        self.assertEqual(release_cord.bumped(None, "minor"), (0, 1, 0))
+        self.assertEqual(publish_cord.parse_version("v0.1.0"), (0, 1, 0))
+        self.assertEqual(publish_cord.parse_version("1.20.3"), (1, 20, 3))
+        self.assertIsNone(publish_cord.parse_version("1.2.3-rc.1"))
+        self.assertIsNone(publish_cord.parse_version("01.2.3"))
+        self.assertEqual(publish_cord.bumped((0, 1, 0), "major"), (1, 0, 0))
+        self.assertEqual(publish_cord.bumped((0, 1, 4), "minor"), (0, 2, 0))
+        self.assertEqual(publish_cord.bumped((0, 1, 4), "patch"), (0, 1, 5))
+        self.assertEqual(publish_cord.bumped(None, "minor"), (0, 1, 0))
 
     def test_anchor_drops_brackets_and_dots(self):
-        self.assertEqual(release_cord.github_anchor("[0.2.0] - 2026-10-28"), "020---2026-10-28")
+        self.assertEqual(publish_cord.github_anchor("[0.2.0] - 2026-10-28"), "020---2026-10-28")
 
     def test_suggest_bump(self):
-        self.assertEqual(release_cord.suggest_bump({"Removed": ["x"], "Added": ["y"]}), "major")
-        self.assertEqual(release_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
-        self.assertEqual(release_cord.suggest_bump({"Changed": ["z"]}), "patch")
+        self.assertEqual(publish_cord.suggest_bump({"Removed": ["x"], "Added": ["y"]}), "major")
+        self.assertEqual(publish_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
+        self.assertEqual(publish_cord.suggest_bump({"Changed": ["z"]}), "patch")
 
     def test_released_changelog(self):
-        text = (release_cord.upload.CHANGELOG_HEADER
+        text = (publish_cord.upload.CHANGELOG_HEADER
                 + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n\n"
                 "## [0.1.0] - 2026-10-27\n\n### Added\n\n- `a-london.jsonl`\n\n"
                 "[Unreleased]: https://github.com/Owner/Repo/compare/0.1.0...HEAD\n"
                 "[0.1.0]: https://github.com/Owner/Repo/releases/tag/0.1.0\n")
-        result = release_cord.released_changelog(
+        result = publish_cord.released_changelog(
             text, "0.2.0", "2026-10-28", "0.1.0", "Owner", "Repo")
-        self.assertEqual(result, release_cord.upload.CHANGELOG_HEADER + textwrap.dedent("""
+        self.assertEqual(result, publish_cord.upload.CHANGELOG_HEADER + textwrap.dedent("""
             ## [Unreleased]
 
             ## [0.2.0] - 2026-10-28
@@ -565,7 +565,7 @@ class ReleaseTest(unittest.TestCase):
                              self.entry("b-london.jsonl", FILE_B, None)])
         # a-london.jsonl is not in senzing-ready/, so its stats come from the draft.
         self.stage("a-london.jsonl", FILE_A)
-        self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
+        self.write("CHANGELOG.md", publish_cord.upload.CHANGELOG_HEADER
                    + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n"
                    + "\n### Changed\n\n- `a-london.jsonl`\n")
         code, output = self.release("prepare", "--bump", "minor")
@@ -598,7 +598,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertNoVersionDraft()
 
     def test_prepare_stops_without_openpyxl(self):
-        with mock.patch.object(release_cord, "openpyxl_available", lambda: False):
+        with mock.patch.object(publish_cord, "openpyxl_available", lambda: False):
             code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("pip install openpyxl", output)

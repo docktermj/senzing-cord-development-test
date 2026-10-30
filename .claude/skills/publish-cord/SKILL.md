@@ -1,10 +1,10 @@
 ---
-name: release-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /release-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
+name: publish-cord
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
-Publish the files in `manifest.json` as a new release. The script `release_cord.py` next
+Publish the files in `manifest.json` as a new release. The script `publish_cord.py` next
 to this file does each step. This skill runs it and asks the user the two questions it can't
 answer: the SemVer bump, and whether to merge.
 
@@ -22,7 +22,7 @@ answer: the SemVer bump, and whether to merge.
 1. Run, from the repository root:
 
    ```bash
-   python3 .claude/skills/release-cord/release_cord.py upload
+   python3 .claude/skills/publish-cord/publish_cord.py upload
    ```
 
    This runs `/upload-senzing-ready` without asking: it prints a `preview:` of what it would
@@ -41,7 +41,7 @@ answer: the SemVer bump, and whether to merge.
 2. Run, from the repository root:
 
    ```bash
-   python3 .claude/skills/release-cord/release_cord.py status
+   python3 .claude/skills/publish-cord/publish_cord.py status
    ```
 
    - **Exit 2:** show each `blocking:` line and stop.
@@ -63,7 +63,7 @@ answer: the SemVer bump, and whether to merge.
 4. Run, with the chosen bump:
 
    ```bash
-   python3 .claude/skills/release-cord/release_cord.py prepare --bump <major|minor|patch>
+   python3 .claude/skills/publish-cord/publish_cord.py prepare --bump <major|minor|patch>
    ```
 
    This step:
@@ -83,11 +83,11 @@ answer: the SemVer bump, and whether to merge.
 5. Show the PR and ask: "Merge `<PR URL>` with `--merge --delete-branch`, then publish
    `<version>`?" Wait for an explicit yes.
    - **No:** say that the draft Release and the branch are left in place, and that
-     `/release-cord` resumes later. Stop.
+     `/publish-cord` resumes later. Stop.
    - **Yes:** run:
 
      ```bash
-     python3 .claude/skills/release-cord/release_cord.py publish
+     python3 .claude/skills/publish-cord/publish_cord.py publish
      ```
 
      This step merges the PR, publishes the draft on the merge commit as the latest Release, switches the clone to an
@@ -127,7 +127,7 @@ answer: the SemVer bump, and whether to merge.
 ## Tests
 
 ```bash
-python3 -m unittest discover -s .claude/skills/release-cord -p 'test_*.py'
+python3 -m unittest discover -s .claude/skills/publish-cord -p 'test_*.py'
 ```
 
 The tests use fake `gh`, `curl` and stats-script executables and a local bare

@@ -14,7 +14,7 @@ each file's size, SHA-256 and download URL: the Release where it last changed.
 
 Each link below serves the version of the file in `manifest.json`, from the Release where it
 last changed. Files are listed per region, from the part of the file name after the last
-hyphen. `/release-cord` rewrites these lists on every release.
+hyphen. `/publish-cord` rewrites these lists on every release.
 
 ### Las Vegas
 

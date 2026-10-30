@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Publish a SemVer release of the CORD JSONL files.
 
-The release-cord skill runs the subcommands in order, asking the user between them:
+The publish-cord skill runs the subcommands in order, asking the user between them:
 
   upload            upload new and changed senzing-ready/ files (/upload-senzing-ready),
                     after printing a preview; skipped while a draft is being resumed

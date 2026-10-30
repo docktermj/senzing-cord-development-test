@@ -1,6 +1,6 @@
 ---
 name: upload-senzing-ready
-description: Upload new and changed CORD JSONL files from the local senzing-ready/ directory to the "unreleased" draft GitHub Release, and record them in manifest.json and the [Unreleased] section of CHANGELOG.md. Use when the user runs /upload-senzing-ready. Commits nothing; /release-cord publishes the result.
+description: Upload new and changed CORD JSONL files from the local senzing-ready/ directory to the "unreleased" draft GitHub Release, and record them in manifest.json and the [Unreleased] section of CHANGELOG.md. Use when the user runs /upload-senzing-ready. Commits nothing; /publish-cord publishes the result.
 disable-model-invocation: true
 argument-hint: "[--remove <name>]..."
 ---
@@ -48,7 +48,7 @@ it and reports.
    `failed`), then show `git diff -- manifest.json CHANGELOG.md`. Exit 1 means some files
    were refused or failed. Their entries are unchanged, and a rerun retries them.
 
-5. Remind the user that nothing is committed, and that `/release-cord` publishes the
+5. Remind the user that nothing is committed, and that `/publish-cord` publishes the
    changes.
 
 ## What the script does
@@ -67,7 +67,7 @@ assets back and confirms that the asset's `digest` is `sha256:<hex>` of the file
 
 The script stops before changing anything if a published (non-draft) Release named
 `unreleased` exists, or a git tag of that name: the staging draft must stay a draft.
-`/release-cord` renames the staging draft to the version it releases, so the next upload
+`/publish-cord` renames the staging draft to the version it releases, so the next upload
 starts a new one.
 
 Before an upload, each file must:

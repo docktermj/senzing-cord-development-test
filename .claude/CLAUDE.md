@@ -18,7 +18,7 @@ changing anything about storage. In short:
 - **Each file is a GitHub Release asset** of the Release where it last changed. That gives
   it a public `curl` URL, the entry's `url` in `manifest.json`:
   `https://github.com/docktermj/senzing-cord-development-test/releases/download/<tag>/<file>`.
-- **Unreleased files are staged on a draft Release tagged `unreleased`.** `/release-cord`
+- **Unreleased files are staged on a draft Release tagged `unreleased`.** `/publish-cord`
   renames it to the version it releases, so the files are never uploaded twice. A draft is
   visible only to the repository's writers. Each asset's `digest` is checked against the
   manifest's `sha256`.
@@ -38,9 +38,9 @@ changing anything about storage. In short:
 
 `/upload-senzing-ready` (`.claude/skills/upload-senzing-ready/`) uploads new and changed
 `senzing-ready/*.jsonl` files to the `unreleased` draft and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
-nothing. `/release-cord` (`.claude/skills/release-cord/`) publishes them:
+nothing. `/publish-cord` (`.claude/skills/publish-cord/`) publishes them:
 
-- it first runs the upload itself (`release_cord.py upload`): a preview, then the upload, stopping
+- it first runs the upload itself (`publish_cord.py upload`): a preview, then the upload, stopping
   on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
 - it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
@@ -58,18 +58,18 @@ manifest. All three stop if only an old `jsonl/` directory exists; move it with
 - each file's SHA-256 is checked;
 - a locally modified file is kept unless named with `--force <name>`.
 
-`release_cord.py` and `download_senzing_ready.py` import shared helpers from
+`publish_cord.py` and `download_senzing_ready.py` import shared helpers from
 `upload_senzing_ready.py`. Tests:
 
 ```bash
-for s in upload-senzing-ready release-cord download-senzing-ready; do
+for s in upload-senzing-ready publish-cord download-senzing-ready; do
   python3 -m unittest discover -s .claude/skills/$s -p 'test_*.py'
 done
 python3 -m unittest discover -s bin -p 'test_*.py'   # skipped without openpyxl
 ```
 
 File names must be `<source>-<region>.jsonl`; `REGIONS` in `upload_senzing_ready.py` maps each
-region to its README heading. `/upload-senzing-ready` refuses other names, and `/release-cord`
+region to its README heading. `/upload-senzing-ready` refuses other names, and `/publish-cord`
 applies the same check. The only Python dependency, `openpyxl`, is in `pyproject.toml`
 (`pip install .`).
 

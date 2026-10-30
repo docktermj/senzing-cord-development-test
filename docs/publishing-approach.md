@@ -10,7 +10,7 @@ This gives every file a stable public HTTPS URL that downloads with `curl` and n
 authentication.
 
 Before it is released, a file is staged on a **draft Release tagged `unreleased`**.
-`/release-cord` renames that draft to the version it releases, so a file is uploaded once.
+`/publish-cord` renames that draft to the version it releases, so a file is uploaded once.
 Each asset's `digest` is checked against the manifest's SHA-256.
 
 `manifest.json` at the repository root holds one entry per file, giving its name, size in
