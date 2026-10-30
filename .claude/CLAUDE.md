@@ -58,6 +58,11 @@ manifest. All three stop if only an old `jsonl/` directory exists; move it with
 - each file's SHA-256 is checked;
 - a locally modified file is kept unless named with `--force <name>`.
 
+`download_senzing_ready.py --verify` writes nothing: it checks each released file's
+Release asset `digest` (through `gh`, without downloading it) and, when it has a `source`,
+the senzing.com copy against the manifest's `sha256`. `.github/workflows/check-releases.yml`
+runs it weekly and on `workflow_dispatch`, and fails on any mismatch or missing file.
+
 `publish_cord.py` and `download_senzing_ready.py` import shared helpers from
 `upload_senzing_ready.py`. Tests:
 

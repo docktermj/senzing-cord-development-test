@@ -5,15 +5,22 @@ Released entries come from their public Release URL; unreleased entries (url
 null) come from the "unreleased" staging draft Release with gh. A current file
 is skipped, and a file whose SHA-256 differs is kept unless named with --force.
 
-Exit codes: 0 senzing-ready/ matches the manifest, 1 some entries failed or are
-locally modified, 2 stopped before downloading anything.
+With --verify it writes nothing: each released entry's Release asset digest is
+compared with its sha256 through the GitHub API, and an entry with a source is
+downloaded from it to a temporary directory, hashed and compared.
+
+Exit codes: 0 senzing-ready/ matches the manifest (or, with --verify, every
+released entry checks out), 1 some entries failed or are locally modified, 2
+stopped before downloading anything.
 """
 
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upload-senzing-ready")
@@ -91,19 +98,109 @@ def run(root, force, out=None):
     return 1 if results["modified"] or results["failed"] else 0
 
 
+# A Release download URL: https://github.com/<owner>/<repo>/releases/download/<tag>/<name>
+RELEASE_URL = re.compile(r"^https://github\.com/([^/]+/[^/]+)/releases/download/([^/]+)/([^/]+)$")
+
+
+def release_digests(repo, tag):
+    """Return ({asset name: SHA-256 hex}, None) for a published Release, or (None, error)."""
+    try:
+        release = upload.release_assets(repo, tag)
+    except StopError as error:
+        return None, str(error).splitlines()[0]
+    if release is None:
+        return None, f"Release {tag} not found"
+    is_draft, digests = release
+    if is_draft:
+        return None, f"Release {tag} is a draft, not published"
+    return digests, None
+
+
+def verify(root, out=None):
+    """Check every released entry against its Release asset digest and its source.
+
+    Writes nothing but a temporary directory, removed afterwards. Unreleased
+    entries (url null) are out of scope and only listed.
+    """
+    out = out or sys.stdout
+    manifest_path = os.path.join(root, "manifest.json")
+    if not os.path.exists(manifest_path):
+        raise StopError("manifest.json not found")
+    entries = sorted(upload.load_manifest(manifest_path)["files"], key=lambda e: e["name"])
+
+    releases = {}  # (repo, tag) -> (digests, error), one gh call per Release
+    ok, unreleased, failed = [], [], []
+    scratch = tempfile.mkdtemp(prefix="verify-cord-")
+    try:
+        for entry in entries:
+            name, url, source = entry["name"], entry.get("url"), entry.get("source")
+            if not url:
+                unreleased.append(name)
+                continue
+            match = RELEASE_URL.match(url)
+            if not match:
+                failed.append(f"{name}: {url}: not a GitHub Release download URL")
+            else:
+                repo, tag, asset = match.groups()
+                if (repo, tag) not in releases:
+                    releases[repo, tag] = release_digests(repo, tag)
+                found, error = releases[repo, tag]
+                if error:
+                    failed.append(f"{name}: {url}: {error}")
+                elif asset not in found:
+                    failed.append(f"{name}: {url}: no such asset on Release {tag}")
+                elif not found[asset]:
+                    failed.append(f"{name}: {url}: the asset has no digest")
+                elif found[asset] != entry["sha256"]:
+                    failed.append(f"{name}: {url}: asset digest sha256:{found[asset]} "
+                                  "does not match manifest.json")
+                else:
+                    ok.append(f"{name}: {url}")
+            if source:
+                print(f"downloading {source}", file=out, flush=True)
+                target = os.path.join(scratch, name)
+                error = fetch(root, {"url": source}, target)
+                if error is None and upload.sha256_and_size(target)[0] != entry["sha256"]:
+                    error = "SHA-256 does not match manifest.json"
+                if os.path.exists(target):
+                    os.remove(target)
+                if error is None:
+                    ok.append(f"{name}: {source}")
+                else:
+                    failed.append(f"{name}: {source}: {error}")
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+    for message in ok:
+        print(f"verified: {message}", file=out)
+    for name in unreleased:
+        print(f"unreleased, not checked: {name}", file=out)
+    for message in failed:
+        print(f"failed: {message}", file=out)
+    return 1 if failed else 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--force", action="append", default=[], metavar="NAME",
         help="overwrite this locally modified file (repeatable)",
     )
+    parser.add_argument(
+        "--verify", action="store_true",
+        help="download nothing into senzing-ready/; check each released entry's Release "
+             "asset digest, and its source copy, against manifest.json",
+    )
     parser.add_argument("--root", help="repository root (default: from git)")
     args = parser.parse_args(argv)
+    if args.verify and args.force:
+        parser.error("--force cannot be used with --verify")
     try:
         root = args.root or upload.git(os.getcwd(), "rev-parse", "--show-toplevel")
-        return run(root, args.force)
+        return verify(root) if args.verify else run(root, args.force)
     except StopError as error:
-        print(f"stopped, nothing downloaded: {error}", file=sys.stderr)
+        print(f"stopped, nothing {'checked' if args.verify else 'downloaded'}: {error}",
+              file=sys.stderr)
         return 2
 
 
