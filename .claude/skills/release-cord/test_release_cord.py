@@ -1,4 +1,4 @@
-"""Tests for release_cord.py, run against fake gh, oras and curl executables.
+"""Tests for release_cord.py, run against fake gh and curl executables.
 
 A real bare git repository stands in for origin. Run with:
   python3 -m unittest discover -s .claude/skills/release-cord -p 'test_*.py'
@@ -21,14 +21,14 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import release_cord  # noqa: E402
 
-REGISTRY = "ghcr.io/owner/repo"
+STAGING = release_cord.upload.STAGING
 
 # Releases and pull requests live in $FAKE_GH_STATE; a merge is a real
 # merge commit pushed to the bare repository at $FAKE_ORIGIN.
 FAKE_GH = textwrap.dedent(
     """\
     #!/usr/bin/env python3
-    import json, os, shutil, subprocess, sys, tempfile
+    import hashlib, json, os, shutil, subprocess, sys, tempfile
     state_dir = os.environ["FAKE_GH_STATE"]
     path = os.path.join(state_dir, "state.json")
     state = json.load(open(path)) if os.path.exists(path) else {"releases": {}, "prs": []}
@@ -45,9 +45,6 @@ FAKE_GH = textwrap.dedent(
         return directory
     def copy(tag, files):
         for f in files:
-            if os.path.basename(f) == os.environ.get("FAKE_GH_FAIL_UPLOAD"):
-                save()
-                sys.exit("HTTP 502: upload failed")
             shutil.copy(f, assets(tag))
     files = [a for a in args if os.path.isabs(a) and os.path.isfile(a)]
     if args[:2] == ["release", "list"]:
@@ -59,14 +56,31 @@ FAKE_GH = textwrap.dedent(
         save()
     elif args[:2] == ["release", "view"]:
         tag = args[2]
-        if opt("--json") == "assets":
+        if tag not in state["releases"]:
+            sys.exit("release not found")
+        if opt("--json") == "isDraft,assets":
             d = assets(tag)
-            print(json.dumps({"assets": [{"name": n, "size": os.path.getsize(os.path.join(d, n))}
-                                         for n in sorted(os.listdir(d))]}))
+            found = []
+            for n in sorted(os.listdir(d)):
+                data = open(os.path.join(d, n), "rb").read()
+                found.append({"name": n, "size": len(data),
+                              "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
+            print(json.dumps({"isDraft": state["releases"][tag]["draft"], "assets": found}))
         else:
             print(json.dumps({"body": state["releases"][tag]["notes"]}))
     elif args[:2] == ["release", "upload"]:
         copy(args[2], files)
+    elif args[:2] == ["release", "delete-asset"]:
+        os.remove(os.path.join(assets(args[2]), args[3]))
+    elif args[:2] == ["release", "download"]:
+        shutil.copy(os.path.join(assets(args[2]), opt("--pattern")), opt("--output"))
+    elif args[:2] == ["release", "edit"] and "--tag" in args:
+        # Renaming a draft: its assets move with it.
+        release = state["releases"].pop(args[2])
+        release.update(title=opt("--title"), notes=opt("--notes"))
+        state["releases"][opt("--tag")] = release
+        os.rename(assets(args[2]), os.path.join(state_dir, "assets", opt("--tag")))
+        save()
     elif args[:2] == ["release", "edit"]:
         release = state["releases"][args[2]]
         release.update(draft="--draft=false" not in args, target=opt("--target"),
@@ -75,6 +89,8 @@ FAKE_GH = textwrap.dedent(
                        check=True)
         save()
     elif args[:2] == ["pr", "create"]:
+        if os.environ.get("FAKE_GH_PR_FAIL"):
+            sys.exit("HTTP 502: pull request not created")
         number = len(state["prs"]) + 1
         url = f"https://github.com/Owner/Repo/pull/{number}"
         state["prs"].append({"number": number, "head": opt("--head"), "state": "OPEN",
@@ -97,8 +113,6 @@ FAKE_GH = textwrap.dedent(
         pr.update(state="MERGED", mergeCommit={"oid": git("rev-parse", "HEAD")})
         shutil.rmtree(work)
         save()
-    elif args[:2] == ["api", "-i"]:
-        print("HTTP/2.0 200 OK\\nX-Oauth-Scopes: repo, write:packages\\n\\n{}")
     else:
         sys.exit("fake gh: unsupported " + " ".join(args))
     """
@@ -117,40 +131,6 @@ FAKE_CURL = textwrap.dedent(
     if state["releases"].get(tag, {}).get("draft", True) or not os.path.exists(path):
         sys.exit(22)
     sys.stdout.buffer.write(open(path, "rb").read())
-    """
-)
-
-# A registry in $FAKE_ORAS_STATE: refs hold manifests, blobs/ holds file contents.
-FAKE_ORAS = textwrap.dedent(
-    """\
-    #!/usr/bin/env python3
-    import json, os, shutil, sys
-    state = os.environ["FAKE_ORAS_STATE"]
-    args = sys.argv[1:]
-    with open(os.path.join(state, "calls.log"), "a") as log:
-        log.write(json.dumps(args) + "\\n")
-    def path(ref):
-        return os.path.join(state, ref.replace("/", "_").replace(":", "@"))
-    if args[:2] == ["manifest", "fetch"]:
-        if not os.path.exists(path(args[-1])):
-            sys.exit(f"Error response from registry: failed to find {args[-1]}: not found")
-        print(open(path(args[-1])).read())
-    elif args[0] == "tag":
-        repository = args[1].rsplit(":", 1)[0]
-        shutil.copy(path(args[1]), path(f"{repository}:{args[2]}"))
-    elif args[0] == "push":
-        import hashlib
-        name = args[-1].rsplit(":", 1)[0]
-        data = open(name, "rb").read()
-        digest = hashlib.sha256(data).hexdigest()
-        with open(path(args[1]), "w") as f:
-            json.dump({"layers": [{"digest": f"sha256:{digest}", "size": len(data)}]}, f)
-        open(os.path.join(state, "blobs", digest), "wb").write(data)
-    elif args[:2] == ["blob", "fetch"]:
-        digest = args[-1].split("@sha256:")[1]
-        shutil.copy(os.path.join(state, "blobs", digest), args[args.index("--output") + 1])
-    else:
-        sys.exit("fake oras: unsupported " + " ".join(args))
     """
 )
 
@@ -206,11 +186,10 @@ class ReleaseTest(unittest.TestCase):
         self.origin = os.path.join(self.tmp, "origin.git")
         self.root = os.path.join(self.tmp, "repo")
         self.gh_state = os.path.join(self.tmp, "gh")
-        self.oras_state = os.path.join(self.tmp, "oras")
         bin_dir = os.path.join(self.tmp, "bin")
-        for directory in (self.gh_state, os.path.join(self.oras_state, "blobs"), bin_dir):
+        for directory in (self.gh_state, bin_dir):
             os.makedirs(directory)
-        for name, body in (("gh", FAKE_GH), ("oras", FAKE_ORAS), ("curl", FAKE_CURL)):
+        for name, body in (("gh", FAKE_GH), ("curl", FAKE_CURL)):
             exe = os.path.join(bin_dir, name)
             with open(exe, "w") as file:
                 file.write(body)
@@ -218,7 +197,6 @@ class ReleaseTest(unittest.TestCase):
         env = {
             "PATH": bin_dir + os.pathsep + os.environ["PATH"],
             "FAKE_GH_STATE": self.gh_state,
-            "FAKE_ORAS_STATE": self.oras_state,
             "FAKE_ORIGIN": self.origin,
             "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
             "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
@@ -236,7 +214,7 @@ class ReleaseTest(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-        # origin holds release v0.1.0 with a-london.jsonl; b-london.jsonl is uploaded, not released.
+        # origin holds release v0.1.0 with a-london.jsonl; b-london.jsonl is staged, not released.
         subprocess.run(["git", "init", "-q", "--bare", "-b", "main", self.origin], check=True)
         subprocess.run(["git", "clone", "-q", self.origin, self.root], check=True,
                        capture_output=True)
@@ -248,8 +226,7 @@ class ReleaseTest(unittest.TestCase):
         self.git("commit", "-q", "-m", "initial")
         self.git("tag", "v0.1.0")
         self.git("push", "-q", "origin", "main", "v0.1.0")
-        self.seed_registry("a-london.jsonl", FILE_A)
-        self.seed_registry("b-london.jsonl", FILE_B)
+        self.stage("b-london.jsonl", FILE_B)
         os.makedirs(os.path.join(self.root, "senzing-ready"))
         with open(os.path.join(self.root, "senzing-ready", "b-london.jsonl"), "wb") as file:
             file.write(FILE_B)
@@ -269,7 +246,6 @@ class ReleaseTest(unittest.TestCase):
         return {
             "name": name, "size": len(data), "sha256": sha(data), "tag": tag,
             "url": tag and f"https://github.com/Owner/Repo/releases/download/{tag}/{name}",
-            "oci": f"{REGISTRY}/{name}",
         }
 
     def write_manifest(self, entries):
@@ -282,19 +258,31 @@ class ReleaseTest(unittest.TestCase):
         self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
                    + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n")
 
-    def seed_registry(self, name, data):
-        ref = f"{REGISTRY}/{name}:sha256-{sha(data)}"
-        with open(os.path.join(self.oras_state, ref.replace("/", "_").replace(":", "@")), "w") as f:
-            json.dump({"layers": [{"digest": f"sha256:{sha(data)}", "size": len(data)}]}, f)
-        with open(os.path.join(self.oras_state, "blobs", sha(data)), "wb") as file:
+    def stage(self, name, data):
+        """Put a file on the staging draft, as /upload-senzing-ready leaves it."""
+        path = os.path.join(self.gh_state, "state.json")
+        state = json.loads(read(path)) if os.path.exists(path) else {"releases": {}, "prs": []}
+        state["releases"].setdefault(STAGING, {"draft": True, "notes": "", "title": STAGING,
+                                               "target": None, "latest": False})
+        with open(path, "w") as file:
+            json.dump(state, file)
+        directory = os.path.join(self.gh_state, "assets", STAGING)
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, name), "wb") as file:
             file.write(data)
 
-    def calls(self, tool):
-        log = os.path.join(self.gh_state if tool == "gh" else self.oras_state, "calls.log")
+    def calls(self):
+        log = os.path.join(self.gh_state, "calls.log")
         return [json.loads(line) for line in read(log).splitlines()] if os.path.exists(log) else []
+
+    def uploads(self):
+        return [c for c in self.calls() if c[:2] == ["release", "upload"]]
 
     def gh_state_json(self):
         return json.loads(read(os.path.join(self.gh_state, "state.json")))
+
+    def assertNoVersionDraft(self):
+        self.assertEqual(list(self.gh_state_json()["releases"]), [STAGING])
 
     def release(self, *args):
         out, err = io.StringIO(), io.StringIO()
@@ -313,7 +301,7 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("status")
         self.assertEqual(code, 2)
         self.assertIn("mv jsonl senzing-ready", output)
-        self.assertEqual(self.calls("gh"), [])
+        self.assertEqual(self.calls(), [])
 
     def test_versions(self):
         self.assertEqual(release_cord.parse_version("v0.1.0"), (0, 1, 0))
@@ -367,14 +355,14 @@ class ReleaseTest(unittest.TestCase):
         with open(os.path.join(self.root, "senzing-ready", name), "wb") as file:
             file.write(data)
 
-    def test_upload_pushes_a_new_file_then_status_offers_the_bump(self):
+    def test_upload_stages_a_new_file_then_status_offers_the_bump(self):
         self.write_ready("c-moscow.jsonl", FILE_C)
         code, output = self.release("upload")
         self.assertEqual(code, 0, output)
-        self.assertLess(output.index("preview:"), output.index("pushed: c-moscow.jsonl"))
-        self.assertIn("would push: c-moscow.jsonl (added)", output)
-        self.assertEqual([c[:2] for c in self.calls("oras") if c[0] == "push"],
-                         [["push", f"{REGISTRY}/c-moscow.jsonl:sha256-{sha(FILE_C)}"]])
+        self.assertLess(output.index("preview:"), output.index("uploaded: c-moscow.jsonl"))
+        self.assertIn("would upload: c-moscow.jsonl (added)", output)
+        self.assertEqual([os.path.basename(c[3]) for c in self.uploads()], ["c-moscow.jsonl"])
+        self.assertEqual(self.uploads()[0][2], STAGING)
         manifest = json.loads(read(os.path.join(self.root, "manifest.json")))
         self.assertIn({"name": "c-moscow.jsonl", "tag": None},
                       [{"name": e["name"], "tag": e["tag"]} for e in manifest["files"]])
@@ -383,15 +371,14 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertIn("next: prepare", output)
 
-    def test_upload_stops_on_a_refused_file_before_any_push(self):
+    def test_upload_stops_on_a_refused_file_before_any_upload(self):
         self.write_ready("c-moscow.jsonl", FILE_C)
         self.write_ready("bob.jsonl", FILE_C)
         code, output = self.release("upload")
         self.assertEqual(code, 1)
         self.assertIn("refused: bob.jsonl: expected <source>-<region>.jsonl", output)
-        self.assertNotIn("upload:", output)
-        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
-        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+        self.assertNotIn("\nupload:", output)
+        self.assertEqual(self.uploads(), [])
 
     def test_upload_with_nothing_new_then_nothing_to_release(self):
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
@@ -399,7 +386,7 @@ class ReleaseTest(unittest.TestCase):
         os.remove(os.path.join(self.root, "senzing-ready", "b-london.jsonl"))
         code, output = self.release("upload")
         self.assertEqual(code, 0, output)
-        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
+        self.assertEqual(self.uploads(), [])
         code, output = self.release("status")
         self.assertEqual(code, 2)
         self.assertIn("nothing to release", output)
@@ -411,7 +398,7 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("upload")
         self.assertEqual(code, 0, output)
         self.assertIn("skipped: resuming draft 0.2.0", output)
-        self.assertEqual([c for c in self.calls("oras") if c[0] == "push"], [])
+        self.assertEqual(self.uploads(), [])
 
     # --- status ---
 
@@ -430,12 +417,27 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("nothing to release", output)
 
-    def test_status_names_files_missing_from_ghcr(self):
-        os.remove(os.path.join(self.oras_state, f"{REGISTRY}/b-london.jsonl:sha256-{sha(FILE_B)}"
-                               .replace("/", "_").replace(":", "@")))
+    def test_status_names_files_missing_from_the_staging_draft(self):
+        os.remove(os.path.join(self.gh_state, "assets", STAGING, "b-london.jsonl"))
         code, output = self.release("status")
         self.assertEqual(code, 2)
-        self.assertIn("no ghcr.io sha256 tag for: b-london.jsonl", output)
+        self.assertIn(f"not in draft Release {STAGING} with a matching digest: b-london.jsonl",
+                      output)
+
+    def test_status_names_staged_files_with_another_digest(self):
+        self.stage("b-london.jsonl", FILE_C)
+        code, output = self.release("status")
+        self.assertEqual(code, 2)
+        self.assertIn(f"not in draft Release {STAGING} with a matching digest: b-london.jsonl",
+                      output)
+
+    def test_status_names_pending_files_without_a_staging_draft(self):
+        shutil.rmtree(os.path.join(self.gh_state, "assets", STAGING))
+        os.remove(os.path.join(self.gh_state, "state.json"))
+        code, output = self.release("status")
+        self.assertEqual(code, 2)
+        self.assertIn(f"not in draft Release {STAGING} with a matching digest: b-london.jsonl",
+                      output)
 
     # --- prepare ---
 
@@ -453,6 +455,10 @@ class ReleaseTest(unittest.TestCase):
         assets = os.path.join(self.gh_state, "assets", "0.2.0")
         # Only the new file: a-london.jsonl is unchanged since v0.1.0.
         self.assertEqual(os.listdir(assets), ["b-london.jsonl"])
+        # The staging draft became 0.2.0; nothing was uploaded again.
+        self.assertNotIn(STAGING, self.gh_state_json()["releases"])
+        self.assertEqual(self.uploads(), [])
+        self.assertEqual([c for c in self.calls() if c[:2] == ["release", "create"]], [])
 
         manifest = json.loads(self.origin_file("release-0.2.0", "manifest.json"))
         urls = {e["name"]: (e["tag"], e["url"]) for e in manifest["files"]}
@@ -466,7 +472,6 @@ class ReleaseTest(unittest.TestCase):
                       changelog)
         self.assertIn("[0.2.0]: https://github.com/Owner/Repo/compare/v0.1.0...0.2.0", changelog)
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
-        self.assertEqual([c for c in self.calls("oras") if c[0] == "tag"], [])
 
     def test_prepare_requires_bump(self):
         code, output = self.release("prepare")
@@ -478,7 +483,7 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("other changes", output)
-        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+        self.assertNoVersionDraft()
 
     def test_prepare_stops_when_version_is_published(self):
         with open(os.path.join(self.gh_state, "state.json"), "w") as file:
@@ -486,22 +491,38 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("published Release or tag 0.2.0 already exists", output)
-        self.assertEqual([c for c in self.calls("gh") if c[:2] == ["release", "create"]], [])
+        self.assertEqual([c for c in self.calls() if c[:2] == ["release", "edit"]], [])
 
-    def test_prepare_resumes_a_partial_draft(self):
-        with mock.patch.dict(os.environ, {"FAKE_GH_FAIL_UPLOAD": "b-london.jsonl"}):
+    def test_prepare_resumes_a_draft(self):
+        with mock.patch.dict(os.environ, {"FAKE_GH_PR_FAIL": "1"}):
             code, _ = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
+        self.assertTrue(self.gh_state_json()["releases"]["0.2.0"]["draft"])
         code, output = self.release("prepare")
         self.assertEqual(code, 0, output)
         self.assertIn("resuming draft 0.2.0", output)
-        uploads = [c for c in self.calls("gh") if c[:2] == ["release", "upload"]]
-        self.assertEqual(len(uploads), 1)
-        self.assertEqual([os.path.basename(a) for a in uploads[0] if a.endswith(".jsonl")],
-                         ["b-london.jsonl"])
-        self.assertIn("--clobber", uploads[0])
+        self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
+        self.assertEqual(self.uploads(), [])
         self.assertEqual(os.listdir(os.path.join(self.gh_state, "assets", "0.2.0")),
                          ["b-london.jsonl"])
+
+    def test_prepare_deletes_staged_files_that_are_not_pending(self):
+        self.stage("stray-london.jsonl", FILE_C)
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 0, output)
+        self.assertIn("deleted from draft: stray-london.jsonl", output)
+        self.assertEqual(os.listdir(os.path.join(self.gh_state, "assets", "0.2.0")),
+                         ["b-london.jsonl"])
+
+    def test_prepare_stops_on_a_published_staging_release(self):
+        state = self.gh_state_json()
+        state["releases"][STAGING]["draft"] = False
+        with open(os.path.join(self.gh_state, "state.json"), "w") as file:
+            json.dump(state, file)
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 2)
+        self.assertIn(f"Release {STAGING} is published", output)
+        self.assertNoVersionDraft()
 
     def test_status_after_prepare_resumes_with_publish(self):
         self.release("prepare", "--bump", "minor")
@@ -542,6 +563,8 @@ class ReleaseTest(unittest.TestCase):
         # a-london.jsonl changed (tag null, listed under Changed); b-london.jsonl is new.
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, None),
                              self.entry("b-london.jsonl", FILE_B, None)])
+        # a-london.jsonl is not in senzing-ready/, so its stats come from the draft.
+        self.stage("a-london.jsonl", FILE_A)
         self.write("CHANGELOG.md", release_cord.upload.CHANGELOG_HEADER
                    + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n"
                    + "\n### Changed\n\n- `a-london.jsonl`\n")
@@ -558,42 +581,37 @@ class ReleaseTest(unittest.TestCase):
     def test_prepare_stops_on_unmapped_region(self):
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
                              self.entry("c-paris.jsonl", FILE_B, None)])
-        self.seed_registry("c-paris.jsonl", FILE_B)
+        self.stage("c-paris.jsonl", FILE_B)
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("region 'paris' has no README heading; add it to REGIONS in "
                       "upload_senzing_ready.py", output)
-        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+        self.assertNoVersionDraft()
 
     def test_prepare_stops_on_name_without_region(self):
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
                              self.entry("bob.jsonl", FILE_B, None)])
-        self.seed_registry("bob.jsonl", FILE_B)
+        self.stage("bob.jsonl", FILE_B)
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("bob.jsonl: expected <source>-<region>.jsonl", output)
-        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+        self.assertNoVersionDraft()
 
     def test_prepare_stops_without_openpyxl(self):
         with mock.patch.object(release_cord, "openpyxl_available", lambda: False):
             code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 2)
         self.assertIn("pip install openpyxl", output)
-        self.assertFalse(os.path.exists(os.path.join(self.gh_state, "state.json")))
+        self.assertNoVersionDraft()
 
     # --- publish ---
 
-    def test_publish_merges_tags_publishes_and_verifies(self):
+    def test_publish_merges_publishes_and_verifies(self):
         self.release("prepare", "--bump", "minor")
         code, output = self.release("publish")
         self.assertEqual(code, 0, output)
-        self.assertIn(["pr", "merge", "1", "--merge", "--delete-branch"], self.calls("gh"))
+        self.assertIn(["pr", "merge", "1", "--merge", "--delete-branch"], self.calls())
         merge = self.gh_state_json()["prs"][0]["mergeCommit"]["oid"]
-        tags = [c for c in self.calls("oras") if c[0] == "tag"]
-        self.assertEqual(tags, [
-            ["tag", f"{REGISTRY}/a-london.jsonl:sha256-{sha(FILE_A)}", "0.2.0"],
-            ["tag", f"{REGISTRY}/b-london.jsonl:sha256-{sha(FILE_B)}", "0.2.0"],
-        ])
         release = self.gh_state_json()["releases"]["0.2.0"]
         self.assertEqual((release["draft"], release["target"], release["latest"]),
                          (False, merge, True))
@@ -610,7 +628,6 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("protected branch", output)
         self.assertTrue(self.gh_state_json()["releases"]["0.2.0"]["draft"])
-        self.assertEqual([c for c in self.calls("oras") if c[0] == "tag"], [])
 
     def test_publish_reports_a_mismatched_download(self):
         self.release("prepare", "--bump", "minor")

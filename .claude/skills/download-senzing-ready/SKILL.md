@@ -14,7 +14,7 @@ does the work; this skill runs it and reports.
   `mv jsonl senzing-ready`. Show that to the user; don't move it yourself.
 - Never pass `--force` unless the user named that file. A locally modified file may be an edit
   waiting for `/upload-senzing-ready`.
-- Change nothing but `senzing-ready/`: not `manifest.json`, `CHANGELOG.md`, `ghcr.io` nor any Release.
+- Change nothing but `senzing-ready/`: not `manifest.json`, `CHANGELOG.md` nor any Release.
 
 ## Steps
 
@@ -31,8 +31,7 @@ does the work; this skill runs it and reports.
    - **Exit 1:** some entries failed or are locally modified.
      - For a **locally modified** file, say that it was kept. The user can upload it with
        `/upload-senzing-ready`, or overwrite it with `/download-senzing-ready --force <name>`.
-     - For a **`ghcr.io` failure**, show the printed fix, usually
-       `gh auth token | oras login ghcr.io -u <user> --password-stdin`.
+     - For an **unreleased file that failed**, show the printed fix, usually `gh auth login`.
    - **Exit 2:** the run stopped before downloading anything. Show the message.
 
 ## What the script does
@@ -46,8 +45,10 @@ For each manifest entry, in name order:
 | SHA-256 differs | Keep it (`locally modified`), unless named with `--force <name>` |
 
 A released entry (with a `url`) downloads from its public Release URL with
-`curl -fsSL`, with no authentication. An unreleased entry (`url` is `null`) downloads with
-`oras blob fetch <oci>@sha256:<sha256>`, which needs `oras login ghcr.io`.
+`curl -fsSL`, with no authentication. An unreleased entry (`url` is `null`) downloads from
+the `unreleased` staging draft Release with
+`gh release download unreleased --pattern <name>`. A draft is visible only to the
+repository's writers, so this needs `gh auth login`.
 
 Each download goes to `senzing-ready/.<name>.part`, is checked against the manifest's SHA-256, and is
 renamed into place only if it matches. A failed or interrupted download leaves no partial
@@ -60,4 +61,4 @@ are left alone. `--force` with a name that isn't in the manifest stops the run.
 python3 -m unittest discover -s .claude/skills/download-senzing-ready -p 'test_*.py'
 ```
 
-The tests use fake `curl` and `oras` executables, so they need no network.
+The tests use fake `curl` and `gh` executables, so they need no network.
