@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-30
+
+### Added
+
+- `us_labor_violations-lasvegas.jsonl` (1,053,930 bytes, SHA-256 `160a12a46d426ba03f9bfeb629b9bf206fcbd58131fc8e106d796aa68d337080`)
+
 ## [0.1.4] - 2026-10-29
 
 ### Changed
@@ -31,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ofac-london.jsonl` (102,967 bytes, SHA-256 `2299bcaf6b9111fed771b3c54a56685f5239f75c57c47d322020f742c21eb40b`)
 
-[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.4...HEAD
+[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.5...HEAD
+[0.1.5]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.1...0.1.2
