@@ -14,8 +14,8 @@ Before it is released, a file is staged on a **draft Release tagged `unreleased`
 Each asset's `digest` is checked against the manifest's SHA-256.
 
 `manifest.json` at the repository root holds one entry per file, giving its name, size in
-bytes, SHA-256, Release tag and download URL. A data change is a pull request that edits the
-manifest.
+bytes, SHA-256, Release tag, download URL and, optionally, its senzing.com `source`. A data
+change is a pull request that edits the manifest.
 
 The reasons are in [Why this approach](#why-this-approach). Each file was at first also
 published to `ghcr.io` (approach 4); [Dropping `ghcr.io`](#dropping-ghcrio) says why that
@@ -233,7 +233,7 @@ the `ghcr.io` copy that was later dropped.
 | SHA-256 | `46d2f256f5c4c3c0aa5f7d0b01b90b9eb139bd4b97251e6d1ebf6ad99890cf55` |
 | Release asset URL | <https://github.com/docktermj/senzing-cord-development-test/releases/download/v0.1.0/gleif-london.jsonl> |
 | OCI artifact | `ghcr.io/docktermj/senzing-cord-development-test:v0.1.0` |
-| Manifest entry | [`manifest.json`](../manifest.json) |
+| Manifest entry | [`manifest.json`](../manifest.json), which now points at `0.1.1`: the same file, re-released |
 
 ### Publish
 
@@ -301,9 +301,12 @@ and kept as history.
 
 Follow-up issues cover the rest:
 
-- moving the other 19 files and changing the [CORD page] links;
-- a Pages catalog generated from the manifest;
-- a way for contributors to submit a file too large for a pull request.
+- [#42](https://github.com/docktermj/senzing-cord-development-test/issues/42): moving the rest of
+  the 21 files and changing the [CORD page] links;
+- [#43](https://github.com/docktermj/senzing-cord-development-test/issues/43): a Pages
+  catalog generated from the manifest;
+- [#44](https://github.com/docktermj/senzing-cord-development-test/issues/44): a way for
+  contributors without write access to submit a file.
 
 ## Appendix: the 21 files
 
