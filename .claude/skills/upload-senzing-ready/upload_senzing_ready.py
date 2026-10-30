@@ -24,10 +24,11 @@ STAGING_NOTES = "Files uploaded by /upload-senzing-ready, waiting for the next r
 MAX_SIZE = 2 * 1024**3  # GitHub Release asset limit
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.jsonl$")
 # README.md heading for each region, the part of a file name after the last hyphen.
-# /publish-cord groups the README file lists by these.
+# /publish-cord groups the README file lists by these; regions may share a heading.
 REGIONS = {
     "lasvegas": "Las Vegas",
     "london": "London",
+    "london_central_a": "London",
     "moscow": "Moscow",
 }
 CHUNK = 1024 * 1024

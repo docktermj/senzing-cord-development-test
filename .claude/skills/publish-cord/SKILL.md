@@ -110,10 +110,12 @@ answer: the SemVer bump, and whether to merge.
   `url` `https://github.com/<owner>/<repo>/releases/download/<version>/<name>`. Unchanged
   entries keep the `tag` and `url` of the Release where they last changed.
 - **`README.md`:** the file lists under `## CORDs` are rewritten from `manifest.json`. There
-  is one `###` section per entry of `REGIONS` in `upload_senzing_ready.py`, in alphabetical order.
-  Each file sits under the region after the last hyphen in its name, sorted, and links to its
-  `url`. A region with no files shows "Not published yet." The text before the first `###`
-  and everything outside `## CORDs` is kept.
+  is one `###` section per heading in `REGIONS` in `upload_senzing_ready.py`, in alphabetical
+  order; regions that share a heading (`london` and `london_central_a` are both `London`)
+  share one section. Each file sits under the heading of the region after the last hyphen in
+  its name, sorted by name, and links to its `url`. A heading with no files shows
+  "Not published yet." once. The text before the first `###` and everything outside
+  `## CORDs` is kept.
 - **`CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
   file, matched on `SOURCE` and `GEO`. It sets the counts (a feature no longer present becomes
   0), `LAST_UPDATED` (the release date) and `UPDATE_REASON` (`Added in <version>` or

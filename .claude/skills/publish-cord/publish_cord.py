@@ -171,7 +171,10 @@ def region_of(name):
 
 
 def readme_cords(text, entries):
-    """Rewrite the file lists under ## CORDs: one ### section per region, sorted."""
+    """Rewrite the file lists under ## CORDs: one ### section per heading, sorted.
+
+    Regions that share a heading in REGIONS share its section.
+    """
     lines = text.splitlines()
     if README_SECTION not in lines:
         raise StopError(f"README.md has no {README_SECTION} section")
@@ -185,9 +188,10 @@ def readme_cords(text, entries):
     while intro and not intro[-1].strip():
         intro.pop()
     section = [README_SECTION] + intro + [""]
-    for region, heading in sorted(upload.REGIONS.items(), key=lambda item: item[1]):
+    for heading in sorted(set(upload.REGIONS.values())):
         files = sorted(
-            (e["name"], e["url"]) for e in entries if region_of(e["name"]) == region
+            (e["name"], e["url"]) for e in entries
+            if upload.REGIONS[region_of(e["name"])] == heading
         )
         section += [f"### {heading}", ""]
         section += [f"- [{name}]({url})" for name, url in files] or ["Not published yet."]

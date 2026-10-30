@@ -321,6 +321,56 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(publish_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
         self.assertEqual(publish_cord.suggest_bump({"Changed": ["z"]}), "patch")
 
+    def test_readme_merges_regions_that_share_a_heading(self):
+        entries = [{"name": name, "url": f"https://example.com/{name}"} for name in (
+            "c-london.jsonl", "globaldata-london_central_a.jsonl", "a-london_central_a.jsonl",
+            "b-london.jsonl")]
+        result = publish_cord.readme_cords(README, entries)
+        self.assertEqual(result.count("### London"), 1)
+        self.assertEqual(result, textwrap.dedent("""\
+            # repo
+
+            ## CORDs
+
+            Intro stays.
+
+            ### Las Vegas
+
+            Not published yet.
+
+            ### London
+
+            - [a-london_central_a.jsonl](https://example.com/a-london_central_a.jsonl)
+            - [b-london.jsonl](https://example.com/b-london.jsonl)
+            - [c-london.jsonl](https://example.com/c-london.jsonl)
+            - [globaldata-london_central_a.jsonl](https://example.com/globaldata-london_central_a.jsonl)
+
+            ### Moscow
+
+            Not published yet.
+
+            ## References
+
+            - kept
+            """))
+
+    def test_readme_heading_without_files_says_not_published_once(self):
+        entries = [{"name": "a-london_central_a.jsonl", "url": "https://example.com/a"}]
+        result = publish_cord.readme_cords(README, entries)
+        self.assertEqual(result.count("### London"), 1)
+        self.assertIn("### London\n\n- [a-london_central_a.jsonl](https://example.com/a)\n\n"
+                      "### Moscow", result)
+        self.assertEqual(result.count("Not published yet."), 2)  # Las Vegas and Moscow
+        self.assertIn("### Las Vegas\n\nNot published yet.\n\n### London", result)
+        self.assertIn("### Moscow\n\nNot published yet.\n\n## References", result)
+
+    def test_readme_for_the_current_manifest_is_unchanged(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))))
+        readme = read(os.path.join(root, "README.md"))
+        entries = json.loads(read(os.path.join(root, "manifest.json")))["files"]
+        self.assertEqual(publish_cord.readme_cords(readme, entries), readme)
+
     def test_released_changelog(self):
         text = (publish_cord.upload.CHANGELOG_HEADER
                 + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n\n"
