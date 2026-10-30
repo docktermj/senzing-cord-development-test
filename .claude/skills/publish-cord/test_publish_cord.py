@@ -118,13 +118,17 @@ FAKE_GH = textwrap.dedent(
     """
 )
 
-# Serves a Release asset only once its Release is published.
+# Serves a Release asset only once its Release is published. senzing.com serves
+# nothing: a HEAD request (-sSIL) there gets a 404.
 FAKE_CURL = textwrap.dedent(
     """\
     #!/usr/bin/env python3
     import json, os, sys
     state_dir = os.environ["FAKE_GH_STATE"]
     url = sys.argv[-1]
+    if url.startswith("https://senzing.com/datasets/"):
+        print("HTTP/2 404")
+        sys.exit(0)
     tag, name = url.split("/releases/download/")[1].split("/")
     state = json.load(open(os.path.join(state_dir, "state.json")))
     path = os.path.join(state_dir, "assets", tag, name)
@@ -410,7 +414,8 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("upload")
         self.assertEqual(code, 0, output)
         self.assertLess(output.index("preview:"), output.index("uploaded: c-moscow.jsonl"))
-        self.assertIn("would upload: c-moscow.jsonl (added)", output)
+        self.assertIn("would upload: c-moscow.jsonl (added, no matching senzing.com copy)",
+                      output)
         self.assertEqual([os.path.basename(c[3]) for c in self.uploads()], ["c-moscow.jsonl"])
         self.assertEqual(self.uploads()[0][2], STAGING)
         manifest = json.loads(read(os.path.join(self.root, "manifest.json")))

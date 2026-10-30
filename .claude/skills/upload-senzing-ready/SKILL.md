@@ -30,7 +30,7 @@ it and reports.
    ```
 
    Exit 2 means it stopped before changing anything. Show the message, which says how to fix
-   it: usually `gh auth login`. Then stop.
+   it: usually `gh auth login`, or a senzing.com check that failed and can be retried. Then stop.
 
 2. Show the user the preview: which files would be uploaded (added, changed or repaired),
    which are current, and which are refused and why. If nothing would be uploaded or removed,
@@ -55,10 +55,21 @@ it and reports.
 
 | Local file | Action | Manifest | CHANGELOG `[Unreleased]` |
 | --- | --- | --- | --- |
-| No entry | Upload | New entry; `tag` and `url` are `null` | Line under `### Added` |
-| SHA-256 differs | Upload | `size` and `sha256` updated; `tag` and `url` set to `null` | Line under `### Changed`, or the `### Added` line rewritten |
-| SHA-256 matches; unreleased; staged asset missing or its `digest` differs | Upload (repair) | Unchanged | None |
+| No entry | Upload | New entry; `tag` and `url` are `null`; `source` checked on senzing.com | Line under `### Added` |
+| SHA-256 differs | Upload | `size` and `sha256` updated; `tag` and `url` set to `null`; `source` checked on senzing.com | Line under `### Changed`, or the `### Added` line rewritten |
+| SHA-256 matches; unreleased; staged asset missing or its `digest` differs | Upload (repair) | Unchanged, `source` included; senzing.com isn't contacted | None |
 | SHA-256 matches; released, or staged with a matching `digest` | None | Unchanged | None |
+
+`source` is checked against `https://senzing.com/datasets/<name>` in the planning step, before
+anything is uploaded, in the preview too. A `curl -sSIL` (HEAD) request's `Content-Length` is
+compared with the local size first. Only when the sizes match is the copy downloaded with
+`curl -fsSL` into a temporary directory, hashed and deleted. `source` becomes that URL when the
+SHA-256 matches, and `null` after a 404, a different size or a different SHA-256. Each added or
+changed file's summary line says which, such as
+`uploaded: <name> (added, senzing.com copy matches)` or
+`would upload: <name> (changed, no matching senzing.com copy)`. Any other failure (another HTTP
+status, a network error, no `Content-Length`, or a failed download) stops the run with exit 2
+before anything is uploaded. Current and refused files aren't checked.
 
 Each upload is `gh release upload unreleased senzing-ready/<name> --repo <owner>/<repo> --clobber`.
 The owner and repo come from the `origin` remote. The first upload creates the staging draft
@@ -89,4 +100,4 @@ to write. `[Unreleased]` holds at most one line per file.
 python3 -m unittest discover -s .claude/skills/upload-senzing-ready -p 'test_*.py'
 ```
 
-The tests run the script against a fake `gh` executable, so they need no network.
+The tests run the script against fake `gh` and `curl` executables, so they need no network.

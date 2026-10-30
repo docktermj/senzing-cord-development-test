@@ -1,4 +1,4 @@
-"""Tests for upload_senzing_ready.py, run against a fake gh executable.
+"""Tests for upload_senzing_ready.py, run against fake gh and curl executables.
 
 Run with:
   python3 -m unittest discover -s .claude/skills/upload-senzing-ready -p 'test_*.py'
@@ -66,6 +66,39 @@ FAKE_GH = textwrap.dedent(
     """
 )
 
+# A fake curl standing in for senzing.com: it serves $FAKE_GH_STATE/senzing/<name>,
+# answers a HEAD request (-sSIL) with a redirect and then the file's status and
+# Content-Length, and logs every call to curl.log. FAKE_CURL_STATUS forces the
+# HEAD status, FAKE_CURL_NO_LENGTH drops Content-Length, FAKE_CURL_DOWN fails
+# every request and FAKE_CURL_GET_FAIL fails the download.
+FAKE_CURL = textwrap.dedent(
+    """\
+    #!/usr/bin/env python3
+    import json, os, shutil, sys
+    state = os.environ["FAKE_GH_STATE"]
+    args = sys.argv[1:]
+    with open(os.path.join(state, "curl.log"), "a") as log:
+        log.write(json.dumps(args) + "\\n")
+    if os.environ.get("FAKE_CURL_DOWN"):
+        sys.exit("curl: (6) Could not resolve host: senzing.com")
+    url = args[-1]
+    path = os.path.join(state, "senzing", url.rsplit("/", 1)[1])
+    if "-sSIL" in args:
+        print("HTTP/1.1 301 Moved Permanently\\r\\ncontent-length: 0\\r\\n\\r")
+        status = os.environ.get("FAKE_CURL_STATUS") or ("200" if os.path.exists(path) else "404")
+        print(f"HTTP/2 {status} \\r")
+        if status == "200" and not os.environ.get("FAKE_CURL_NO_LENGTH"):
+            print(f"content-length: {os.path.getsize(path)}\\r")
+        print("\\r")
+    elif os.environ.get("FAKE_CURL_GET_FAIL"):
+        sys.exit("curl: (56) Recv failure: Connection reset by peer")
+    elif not os.path.exists(path):
+        sys.exit("curl: (22) The requested URL returned error: 404")
+    else:
+        shutil.copy(path, args[args.index("-o") + 1])
+    """
+)
+
 LINES_A = b'{"RECORD_ID": "1"}\n{"RECORD_ID": "2"}\n'
 LINES_B = b'{"RECORD_ID": "1"}\n{"RECORD_ID": "3"}\n'
 
@@ -79,7 +112,9 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-class UploadTest(unittest.TestCase):
+class FakeToolsTest(unittest.TestCase):
+    """Fake gh and curl on PATH, a repository root and the fakes' state."""
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp)
@@ -88,10 +123,12 @@ class UploadTest(unittest.TestCase):
         bin_dir = os.path.join(self.tmp, "bin")
         for directory in (self.root, self.state, bin_dir, os.path.join(self.root, "senzing-ready")):
             os.makedirs(directory, exist_ok=True)
-        exe = os.path.join(bin_dir, "gh")
-        with open(exe, "w") as file:
-            file.write(FAKE_GH)
-        os.chmod(exe, os.stat(exe).st_mode | stat.S_IEXEC)
+        for name, body in (("gh", FAKE_GH), ("curl", FAKE_CURL)):
+            exe = os.path.join(bin_dir, name)
+            with open(exe, "w") as file:
+                file.write(body)
+            os.chmod(exe, os.stat(exe).st_mode | stat.S_IEXEC)
+        os.makedirs(os.path.join(self.state, "senzing"))
         subprocess.run(["git", "init", "-q", self.root], check=True)
         subprocess.run(
             ["git", "-C", self.root, "remote", "add", "origin", "git@github.com:Owner/Repo.git"],
@@ -129,6 +166,20 @@ class UploadTest(unittest.TestCase):
             return []
         return [json.loads(line) for line in read(log).splitlines()]
 
+    def curls(self):
+        log = os.path.join(self.state, "curl.log")
+        if not os.path.exists(log):
+            return []
+        return [json.loads(line) for line in read(log).splitlines()]
+
+    def downloads(self):
+        return [call for call in self.curls() if "-o" in call]
+
+    def serve(self, name, data):
+        """Put a file on the fake senzing.com."""
+        with open(os.path.join(self.state, "senzing", name), "wb") as file:
+            file.write(data)
+
     def uploads(self):
         return [call for call in self.calls() if call[:2] == ["release", "upload"]]
 
@@ -162,7 +213,8 @@ class UploadTest(unittest.TestCase):
             code = upload_senzing_ready.main(["--root", self.root, *args])
         return code, out.getvalue()
 
-    # --- tests ---
+
+class UploadTest(FakeToolsTest):
 
     def test_old_jsonl_dir_alone_stops(self):
         os.rmdir(os.path.join(self.root, "senzing-ready"))
@@ -179,7 +231,7 @@ class UploadTest(unittest.TestCase):
             self.manifest()["a-london.jsonl"],
             {
                 "name": "a-london.jsonl", "size": len(LINES_A), "sha256": sha(LINES_A),
-                "tag": None, "url": None,
+                "tag": None, "url": None, "source": None,
             },
         )
         self.assertIn("## [Unreleased]\n\n### Added\n\n- `a-london.jsonl`", self.changelog())
@@ -229,7 +281,7 @@ class UploadTest(unittest.TestCase):
         entry = self.manifest()["a-london.jsonl"]
         self.assertEqual((entry["sha256"], entry["size"]), (sha(LINES_B), len(LINES_B)))
         self.assertEqual((entry["tag"], entry["url"]), (None, None))
-        self.assertEqual(entry["source"], "https://example.com/a")
+        self.assertIsNone(entry["source"])
         self.assertIn("### Changed\n\n- `a-london.jsonl`", self.changelog())
 
     def test_released_file_is_current(self):
@@ -411,7 +463,7 @@ class UploadTest(unittest.TestCase):
         self.write_jsonl("a-london.jsonl", LINES_A)
         code, output = self.run_upload("--dry-run")
         self.assertEqual(code, 0)
-        self.assertIn("would upload: a-london.jsonl (added)", output)
+        self.assertIn("would upload: a-london.jsonl (added, no matching senzing.com copy)", output)
         self.assertEqual(self.uploads(), [])
         self.assertFalse(os.path.exists(os.path.join(self.root, "manifest.json")))
 
@@ -423,6 +475,138 @@ class UploadTest(unittest.TestCase):
         with open(os.path.join(self.root, "manifest.json")) as file:
             names = [entry["name"] for entry in json.load(file)["files"]]
         self.assertEqual(names, ["a-london.jsonl", "m-london.jsonl", "z-london.jsonl"])
+
+
+SENZING = "https://senzing.com/datasets/"
+
+
+class SenzingSourceTest(FakeToolsTest):
+    """The senzing.com check that sets an added or changed entry's source."""
+
+    def test_matching_senzing_copy_sets_source(self):
+        self.serve("a-london.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.manifest()["a-london.jsonl"]["source"], SENZING + "a-london.jsonl")
+        self.assertIn("uploaded: a-london.jsonl (added, senzing.com copy matches)", output)
+        self.assertEqual(self.curls()[0], ["-sSIL", SENZING + "a-london.jsonl"])
+        self.assertEqual(len(self.downloads()), 1)
+
+    def test_404_sets_null_source_without_download(self):
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertIsNone(self.manifest()["a-london.jsonl"]["source"])
+        self.assertIn("uploaded: a-london.jsonl (added, no matching senzing.com copy)", output)
+        self.assertEqual(self.downloads(), [])
+        self.assertEqual(self.staged(), ["a-london.jsonl"])
+
+    def test_different_size_sets_null_source_without_download(self):
+        self.serve("a-london.jsonl", LINES_A + b'{"RECORD_ID": "9"}\n')
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertIsNone(self.manifest()["a-london.jsonl"]["source"])
+        self.assertEqual(len(self.curls()), 1)
+        self.assertEqual(self.downloads(), [])
+        self.assertEqual(self.staged(), ["a-london.jsonl"])
+
+    def test_same_size_different_sha256_sets_null_source(self):
+        self.assertEqual(len(LINES_A), len(LINES_B))
+        self.serve("a-london.jsonl", LINES_B)
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertIsNone(self.manifest()["a-london.jsonl"]["source"])
+        self.assertIn("uploaded: a-london.jsonl (added, no matching senzing.com copy)", output)
+        self.assertEqual(len(self.downloads()), 1)
+        self.assertEqual(self.staged(), ["a-london.jsonl"])
+
+    def test_changed_file_gets_source_rechecked(self):
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A, source=SENZING + "a-london.jsonl"),
+                            self.entry("b-london.jsonl", LINES_A))
+        self.serve("a-london.jsonl", LINES_A)  # senzing.com still has the old copy
+        self.serve("b-london.jsonl", LINES_B)
+        self.write_jsonl("a-london.jsonl", LINES_B)
+        self.write_jsonl("b-london.jsonl", LINES_B)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        manifest = self.manifest()
+        self.assertIsNone(manifest["a-london.jsonl"]["source"])
+        self.assertEqual(manifest["b-london.jsonl"]["source"], SENZING + "b-london.jsonl")
+        self.assertIn("uploaded: a-london.jsonl (changed, no matching senzing.com copy)", output)
+        self.assertIn("uploaded: b-london.jsonl (changed, senzing.com copy matches)", output)
+
+    def test_repaired_file_keeps_source_and_is_not_checked(self):
+        old = self.entry("a-london.jsonl", LINES_A, tag=None, url=None,
+                         source=SENZING + "a-london.jsonl")
+        self.write_manifest(old)
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.manifest()["a-london.jsonl"], old)
+        self.assertIn("uploaded: a-london.jsonl (repair)\n", output)
+        self.assertEqual(self.curls(), [])
+
+    def test_current_and_refused_files_are_not_checked(self):
+        self.write_manifest(self.entry("a-london.jsonl", LINES_A))
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        self.write_jsonl("bad-london.jsonl", b"not json\n")
+        self.write_jsonl("x-paris.jsonl", LINES_A)
+        code, output = self.run_upload()
+        self.assertEqual(code, 1)
+        self.assertIn("current: a-london.jsonl", output)
+        self.assertEqual(self.curls(), [])
+
+    def test_dry_run_runs_the_same_check(self):
+        self.serve("a-london.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        self.write_jsonl("b-london.jsonl", LINES_B)
+        code, output = self.run_upload("--dry-run")
+        self.assertEqual(code, 0, output)
+        self.assertIn("would upload: a-london.jsonl (added, senzing.com copy matches)", output)
+        self.assertIn("would upload: b-london.jsonl (added, no matching senzing.com copy)", output)
+        self.assertEqual(len(self.downloads()), 1)
+        self.assertEqual(self.uploads(), [])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "manifest.json")))
+
+    def test_download_goes_to_a_temporary_directory_that_is_removed(self):
+        scratch = os.path.join(self.tmp, "scratch")
+        os.makedirs(scratch)
+        self.serve("a-london.jsonl", LINES_A)
+        self.write_jsonl("a-london.jsonl", LINES_A)
+        with mock.patch.object(tempfile, "tempdir", scratch):
+            code, output = self.run_upload()
+        self.assertEqual(code, 0, output)
+        target = self.downloads()[0]
+        target = target[target.index("-o") + 1]
+        self.assertEqual(os.path.dirname(os.path.dirname(target)), scratch)
+        self.assertEqual(os.listdir(scratch), [])
+
+    def test_other_failures_stop_before_any_upload(self):
+        self.serve("a-london.jsonl", LINES_A)
+        cases = [
+            ({"FAKE_CURL_STATUS": "403"}, "HTTP 403"),
+            ({"FAKE_CURL_STATUS": "503"}, "HTTP 503"),
+            ({"FAKE_CURL_DOWN": "1"}, "Could not resolve host"),
+            ({"FAKE_CURL_NO_LENGTH": "1"}, "no Content-Length"),
+            ({"FAKE_CURL_GET_FAIL": "1"}, "cannot download " + SENZING + "a-london.jsonl"),
+        ]
+        for dry_run in ([], ["--dry-run"]):
+            for env, message in cases:
+                with self.subTest(env=env, dry_run=dry_run):
+                    self.write_jsonl("a-london.jsonl", LINES_A)
+                    self.write_jsonl("b-london.jsonl", LINES_B)
+                    with mock.patch.dict(os.environ, env):
+                        code, output = self.run_upload(*dry_run)
+                    self.assertEqual(code, 2, output)
+                    self.assertIn("stopped, nothing changed: ", output)
+                    self.assertIn(message, output)
+                    self.assertEqual(self.uploads(), [])
+                    self.assertEqual(self.releases(), {})
+                    self.assertFalse(os.path.exists(os.path.join(self.root, "manifest.json")))
+                    self.assertIsNone(self.changelog())
 
 
 if __name__ == "__main__":

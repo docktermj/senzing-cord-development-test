@@ -6,6 +6,10 @@ Each file is staged as an asset of the draft Release tagged "unreleased", which
 [Unreleased] section of CHANGELOG.md are updated in the working tree; nothing is
 committed.
 
+Each added or changed file's manifest source is set to its
+https://senzing.com/datasets/ URL when that copy has the same SHA-256, and to
+null otherwise.
+
 Exit codes: 0 success, 1 some files refused or failed, 2 stopped before
 changing anything.
 """
@@ -15,8 +19,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 # The draft Release that holds uploaded files until /publish-cord releases them.
 STAGING = "unreleased"
@@ -32,6 +38,8 @@ REGIONS = {
     "moscow": "Moscow",
 }
 CHUNK = 1024 * 1024
+# Where senzing.com serves the CORD files; a match there becomes the entry's source.
+SENZING_DATASETS = "https://senzing.com/datasets/"
 
 # Keep a Changelog section order.
 SECTION_ORDER = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
@@ -191,6 +199,78 @@ def unstage(repo, name):
     return None
 
 
+# --- senzing.com --------------------------------------------------------------
+
+
+def curl(*args):
+    """Run curl; return (stdout, None), or (None, error) if it fails."""
+    try:
+        result = subprocess.run(["curl", *args], capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return None, "curl is not on PATH"
+    if result.returncode != 0:
+        return None, result.stderr.strip() or f"curl exited with {result.returncode}"
+    return result.stdout, None
+
+
+def curl_head(url):
+    """Return (HTTP status, Content-Length or None) of url's last response after redirects.
+
+    Raises StopError if the request itself fails.
+    """
+    headers, error = curl("-sSIL", url)
+    if error:
+        raise StopError(f"cannot check {url}: {error}")
+    status, length = None, None
+    for line in headers.splitlines():
+        if line.startswith("HTTP/"):
+            status, length = int(line.split()[1]), None
+        elif line.lower().startswith("content-length:"):
+            value = line.split(":", 1)[1].strip()
+            length = int(value) if value.isdigit() else None
+    return status, length
+
+
+def curl_sha256(url, target):
+    """Download url to target, hash it and remove it; return (SHA-256 hex, None) or (None, error)."""
+    try:
+        _, error = curl("-fsSL", "-o", target, url)
+        if error:
+            return None, error
+        return sha256_and_size(target)[0], None
+    finally:
+        if os.path.exists(target):
+            os.remove(target)
+
+
+def senzing_source(name, sha256, size):
+    """Return senzing.com's URL for name if it serves the same bytes, or None.
+
+    Only a 404 means there is no copy. A HEAD request's Content-Length is compared
+    first, so a copy of another size is not downloaded; one of the same size is
+    downloaded to a temporary directory, hashed and removed. Any other failure
+    raises StopError.
+    """
+    url = SENZING_DATASETS + name
+    status, length = curl_head(url)
+    if status == 404:
+        return None
+    if status != 200:
+        raise StopError(f"cannot check {url}: HTTP {status}")
+    if length is None:
+        raise StopError(f"cannot check {url}: the response has no Content-Length")
+    if length != size:
+        return None
+    scratch = tempfile.mkdtemp(prefix="senzing-source-")
+    try:
+        found, error = curl_sha256(url, os.path.join(scratch, name))
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    if error:
+        raise StopError(f"cannot download {url}: {error}")
+    return url if found == sha256 else None
+
+
 # --- manifest.json ------------------------------------------------------------
 
 
@@ -327,7 +407,8 @@ def update_changelog(path, changes):
 def plan(root, manifest, staged, removals):
     """Classify every senzing-ready/*.jsonl file. Returns (pushes, current, refused).
 
-    staged is the staging draft's {name: SHA-256 hex}.
+    staged is the staging draft's {name: SHA-256 hex}. Each added or changed push
+    carries its source: senzing.com's URL when it serves the same bytes, else None.
     """
     entries = {entry["name"]: entry for entry in manifest["files"]}
     ready_dir = working_dir(root)
@@ -355,8 +436,11 @@ def plan(root, manifest, staged, removals):
         error = validation_error(path, name, size)
         if error:
             refused.append((name, error))
-        else:
-            pushes.append({"kind": kind, "name": name, "sha256": sha256, "size": size})
+            continue
+        push = {"kind": kind, "name": name, "sha256": sha256, "size": size}
+        if kind != "Repair":
+            push["source"] = senzing_source(name, sha256, size)
+        pushes.append(push)
     return pushes, current, refused
 
 
@@ -399,10 +483,11 @@ def run(root, removals, dry_run, out=None, repo=None):
         if item["kind"] == "Added":
             entries[name] = {
                 "name": name, "size": item["size"], "sha256": item["sha256"],
-                "tag": None, "url": None,
+                "tag": None, "url": None, "source": item["source"],
             }
         elif item["kind"] == "Changed":
-            entries[name].update(size=item["size"], sha256=item["sha256"], tag=None, url=None)
+            entries[name].update(size=item["size"], sha256=item["sha256"], tag=None, url=None,
+                                 source=item["source"])
         if item["kind"] != "Repair":
             changes.append(
                 (item["kind"], name, file_line(name, item["size"], item["sha256"]))
@@ -427,7 +512,11 @@ def run(root, removals, dry_run, out=None, repo=None):
 
     verb = "would upload" if dry_run else "uploaded"
     for item in pushed:
-        print(f"{verb}: {item['name']} ({item['kind'].lower()})", file=out)
+        detail = item["kind"].lower()
+        if "source" in item:
+            detail += (", senzing.com copy matches" if item["source"]
+                       else ", no matching senzing.com copy")
+        print(f"{verb}: {item['name']} ({detail})", file=out)
     for name in removed:
         print(f"{'would remove' if dry_run else 'removed'}: {name}", file=out)
     for name in current:
