@@ -21,6 +21,7 @@ hyphen. `/publish-cord` rewrites these lists on every release.
 - [opendata-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl)
 - [opendata2-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.4/opendata2-lasvegas.jsonl)
 - [opendata3-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.6/opendata3-lasvegas.jsonl)
+- [opendata4-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.7/opendata4-lasvegas.jsonl)
 - [us_labor_violations-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl)
 
 ### London

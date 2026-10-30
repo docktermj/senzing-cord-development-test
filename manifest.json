@@ -37,6 +37,13 @@
       "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.6/opendata3-lasvegas.jsonl"
     },
     {
+      "name": "opendata4-lasvegas.jsonl",
+      "size": 1961376474,
+      "sha256": "0af30655896cf3227f3debfaa349e270476579be198b62c99fd029b7a93af69f",
+      "tag": "0.1.7",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.7/opendata4-lasvegas.jsonl"
+    },
+    {
       "name": "us_labor_violations-lasvegas.jsonl",
       "size": 1053930,
       "sha256": "160a12a46d426ba03f9bfeb629b9bf206fcbd58131fc8e106d796aa68d337080",
