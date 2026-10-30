@@ -100,7 +100,7 @@ markdownlint README.md CHANGELOG.md 'docs/*.md' '.claude/*.md' '.claude/**/*.md'
 
 - **Don't change upstream.** Don't change links on the CORD page
   (<https://senzing.com/senzing-ready-data-collections-cord/>), and don't remove anything from
-  `https://senzing.com/datasets/`. Moving the other 19 files and updating those links is
-  follow-up work.
+  `https://senzing.com/datasets/`. Moving the rest of the 21 files and updating those links
+  is follow-up work.
 - **Check SHA-256 on every publish.** A Release asset must match the copy on senzing.com and
   the manifest entry.
