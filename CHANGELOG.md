@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-30
+
+### Added
+
+- `profound-lasvegas.jsonl` (18,495,735 bytes, SHA-256 `82ced042c55a433ded4aea135d3c4c25b321fbc231b4ba0d0418d4650d36b570`)
+
 ## [0.1.7] - 2026-10-30
 
 ### Added
@@ -49,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ofac-london.jsonl` (102,967 bytes, SHA-256 `2299bcaf6b9111fed771b3c54a56685f5239f75c57c47d322020f742c21eb40b`)
 
-[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.7...HEAD
+[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.8...HEAD
+[0.1.8]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.5...0.1.6
 [0.1.5]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.4...0.1.5

@@ -10,6 +10,7 @@
 | [opendata2-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.4/opendata2-lasvegas.jsonl) | 0.1.4 | 1,961,376,474 | `0af30655896cf3227f3debfaa349e270476579be198b62c99fd029b7a93af69f` |
 | [opendata3-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.6/opendata3-lasvegas.jsonl) | 0.1.6 | 980,688,237 | `eed5ff8d46bea3ad24bf369541f35339968e646ea3b8af2ce3c02146ffae56b7` |
 | [opendata4-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.7/opendata4-lasvegas.jsonl) | 0.1.7 | 1,961,376,474 | `0af30655896cf3227f3debfaa349e270476579be198b62c99fd029b7a93af69f` |
+| [profound-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.8/profound-lasvegas.jsonl) | 0.1.8 | 18,495,735 | `82ced042c55a433ded4aea135d3c4c25b321fbc231b4ba0d0418d4650d36b570` |
 | [us_labor_violations-lasvegas.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl) | 0.1.5 | 1,053,930 | `160a12a46d426ba03f9bfeb629b9bf206fcbd58131fc8e106d796aa68d337080` |
 
 ## London
