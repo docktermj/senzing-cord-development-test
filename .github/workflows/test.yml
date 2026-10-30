@@ -37,3 +37,20 @@ jobs:
           # The bin tests skip without openpyxl; fail instead, so they always run here.
           python3 -c 'import openpyxl'
           python3 -m unittest discover -s bin -p 'test_*.py'
+
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The same CLI and version used locally (markdownlint-cli, not markdownlint-cli2).
+      - name: Install markdownlint-cli
+        run: npm install --global markdownlint-cli@0.48.0
+
+      # Globs are quoted so markdownlint expands them, including ** into .claude/skills/*/.
+      - name: markdownlint
+        run: markdownlint README.md CHANGELOG.md 'docs/*.md' '.claude/*.md' '.claude/**/*.md'

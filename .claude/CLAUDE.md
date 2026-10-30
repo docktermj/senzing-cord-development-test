@@ -70,7 +70,8 @@ python3 -m unittest discover -s bin -p 'test_*.py'   # skipped without openpyxl
 
 CI (`.github/workflows/test.yml`) runs these on every pull request and on pushes to `main`,
 on Python 3.10 and 3.12, after `pip install .`, and fails if `openpyxl` is missing rather
-than skipping the `bin` tests. It does not run `markdownlint` (#33).
+than skipping the `bin` tests. A separate `markdownlint` job runs the lint command below with
+`markdownlint-cli` 0.48.0, so any lint error fails CI.
 
 File names must be `<source>-<region>.jsonl`; `REGIONS` in `upload_senzing_ready.py` maps each
 region to its README heading. `/upload-senzing-ready` refuses other names, and `/publish-cord`
@@ -85,7 +86,9 @@ curl -fsSL <release-url> | sha256sum
 # The digest of every asset on the staging draft
 gh release view unreleased --json assets --jq '.assets[] | "\(.name) \(.digest)"'
 
-markdownlint README.md docs/*.md   # MD013 (line length) is known to fail; there is no lint config
+# Lint, as CI does (.markdownlint.json: MD013 and MD041 off, MD024 siblings_only;
+# .markdownlintignore skips .claude/worktrees/). Quote the globs so markdownlint expands them.
+markdownlint README.md CHANGELOG.md 'docs/*.md' '.claude/*.md' '.claude/**/*.md'
 ```
 
 ## Constraints

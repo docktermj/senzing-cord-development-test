@@ -49,7 +49,7 @@ answer: the SemVer bump, and whether to merge.
      - "not in draft Release … with a matching digest" means rerunning
        `/upload-senzing-ready` with the file in `senzing-ready/`.
      - "region … has no README heading" means adding the region to `REGIONS` in
-       `upload_senzing_ready.py`; "expected <source>-<region>.jsonl" means renaming the file.
+       `upload_senzing_ready.py`; "expected `<source>-<region>.jsonl`" means renaming the file.
      - "needs openpyxl" means running `pip install openpyxl`, or `pip install .` from the
        repository root.
    - **`draft: <version> (resume)`:** say so, skip the bump question, and go to the step that
