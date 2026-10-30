@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A test copy of senzing-garage/cord-development, used to work out how to publish the Senzing
 Collections of Relatable Data (CORD): 21 JSONL files, about 1.68 GB in all, served today from
-`https://senzing.com/datasets/`. It has no application code, build, tests or CI.
+`https://senzing.com/datasets/`. It has no application code or build.
 
 ## How the data is published
 
@@ -67,6 +67,10 @@ for s in upload-senzing-ready publish-cord download-senzing-ready; do
 done
 python3 -m unittest discover -s bin -p 'test_*.py'   # skipped without openpyxl
 ```
+
+CI (`.github/workflows/test.yml`) runs these on every pull request and on pushes to `main`,
+on Python 3.10 and 3.12, after `pip install .`, and fails if `openpyxl` is missing rather
+than skipping the `bin` tests. It does not run `markdownlint` (#33).
 
 File names must be `<source>-<region>.jsonl`; `REGIONS` in `upload_senzing_ready.py` maps each
 region to its README heading. `/upload-senzing-ready` refuses other names, and `/publish-cord`
