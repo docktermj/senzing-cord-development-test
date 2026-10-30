@@ -49,10 +49,15 @@ nothing. `/publish-cord` (`.claude/skills/publish-cord/`) publishes them:
   on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
 - it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
-  also rewrites the `## CORDs` lists in `README.md` and the files' rows in `CORD_stats.xlsx`
-  (through `bin/get_cord_stats.py`);
+  also rewrites the `## CORDs` lists in `README.md`, the catalog `docs/cords.md` and the files'
+  rows in `CORD_stats.xlsx` (through `bin/get_cord_stats.py`);
 - it asks before merging;
 - it then publishes the draft on the merge commit.
+
+`docs/cords.md`, the CORD catalog that GitHub Pages serves from `main:/docs`, is generated from
+`manifest.json` and never edited by hand. After a manifest change outside a release, such as
+`/upload-senzing-ready --remove`, rewrite it with `publish_cord.py catalog`, which needs no
+network or `gh`. A test fails while it is out of date.
 
 `/download-senzing-ready` (`.claude/skills/download-senzing-ready/`) fills `senzing-ready/` from the
 manifest. All three stop if only an old `jsonl/` directory exists; move it with

@@ -1,6 +1,6 @@
 ---
 name: publish-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, README.md, docs/cords.md and CORD_stats.xlsx updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
@@ -73,8 +73,8 @@ answer: the SemVer bump, and whether to merge.
      changed file is missing or its `digest` doesn't match `manifest.json`;
    - runs `bin/get_cord_stats.py` on those same files to update `CORD_stats.xlsx`, taking each
      from `senzing-ready/` when its SHA-256 matches and from the draft otherwise;
-   - commits `manifest.json`, `CHANGELOG.md`, `README.md` and `CORD_stats.xlsx` on the
-     branch `release-<version>`;
+   - commits `manifest.json`, `CHANGELOG.md`, `README.md`, `docs/cords.md` and
+     `CORD_stats.xlsx` on the branch `release-<version>`;
    - pushes the branch and opens the PR.
 
    Report the `pull request:` URL. Exit 2 means it stopped; show the message. A rerun (go back
@@ -116,6 +116,14 @@ answer: the SemVer bump, and whether to merge.
   its name, sorted by name, and links to its `url`. A heading with no files shows
   "Not published yet." once. The text before the first `###` and everything outside
   `## CORDs` is kept.
+- **`docs/cords.md`:** the CORD catalog, rewritten from `manifest.json` and served by GitHub
+  Pages from `main:/docs`. It has one `##` section per heading, in the same order as
+  `README.md`, each with a table of File (linked to its `url`), Version (`tag`), Size (bytes)
+  and SHA-256. Files with `tag` `null` are left out, and a heading with no released files
+  shows "Not published yet.". When `manifest.json` changes outside a release (for example
+  `/upload-senzing-ready --remove`), run
+  `python3 .claude/skills/publish-cord/publish_cord.py catalog` to rewrite it; it needs no
+  network or `gh`, and leaves a current file unchanged.
 - **`CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
   file, matched on `SOURCE` and `GEO`. It sets the counts (a feature no longer present becomes
   0), `LAST_UPDATED` (the release date) and `UPDATE_REASON` (`Added in <version>` or
@@ -133,5 +141,7 @@ python3 -m unittest discover -s .claude/skills/publish-cord -p 'test_*.py'
 ```
 
 The tests use fake `gh`, `curl` and stats-script executables and a local bare
-repository as `origin`, so they need no network. `bin/test_get_cord_stats.py` tests the stats
-script against a small workbook, and is skipped without `openpyxl`.
+repository as `origin`, so they need no network. They also fail when the committed
+`README.md` lists or `docs/cords.md` differ from what `manifest.json` gives.
+`bin/test_get_cord_stats.py` tests the stats script against a small workbook, and is skipped
+without `openpyxl`.

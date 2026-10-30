@@ -34,8 +34,9 @@ A writer to this repository, in Claude Code:
    `REGIONS`, and `--remove <name>` takes a file out of the manifest.
 4. **`/publish-cord`** runs that upload itself, asks for the SemVer bump, renames the draft to
    the new version, and opens a `release-<version>` pull request that updates `manifest.json`,
-   `CHANGELOG.md`, the `## CORDs` lists in `README.md` and `CORD_stats.xlsx`. After the user
-   approves the merge, it publishes the Release on the merge commit.
+   `CHANGELOG.md`, the `## CORDs` lists in `README.md`, the catalog `docs/cords.md` and
+   `CORD_stats.xlsx`. After the user approves the merge, it publishes the Release on the merge
+   commit.
 5. **`check-releases.yml`** runs `download_senzing_ready.py --verify` weekly. It fails if a
    released file's asset `digest`, or its senzing.com copy, no longer matches the manifest's
    `sha256`.
@@ -327,12 +328,10 @@ and kept as history.
   instead of by position. An insertion would then change one shard rather than every later
   one.
 
-Follow-up issues cover the rest:
+A follow-up issue covers the rest:
 
 - [#42](https://github.com/docktermj/senzing-cord-development-test/issues/42): moving the rest of
-  the 21 files and changing the [CORD page] links;
-- [#43](https://github.com/docktermj/senzing-cord-development-test/issues/43): a Pages
-  catalog generated from the manifest.
+  the 21 files and changing the [CORD page] links.
 
 ## Appendix: the 21 files
 
