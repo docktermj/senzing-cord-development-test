@@ -1,4 +1,4 @@
-"""Tests for download_senzing_ready.py, run against fake curl and oras executables.
+"""Tests for download_senzing_ready.py, run against fake curl and gh executables.
 
 Run with:
   python3 -m unittest discover -s .claude/skills/download-senzing-ready -p 'test_*.py'
@@ -19,8 +19,9 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import download_senzing_ready  # noqa: E402
 
-# Both fakes serve files from $FAKE_STORE: curl by the URL's last path segment,
-# oras by the digest. Every call is logged to $FAKE_STORE/calls.log.
+# Both fakes serve files from $FAKE_STORE: curl by the URL's last path segment
+# from release/, gh by the --pattern name from staging/. Every call is logged to
+# $FAKE_STORE/calls.log.
 FAKE_CURL = textwrap.dedent(
     """\
     #!/usr/bin/env python3
@@ -36,19 +37,19 @@ FAKE_CURL = textwrap.dedent(
     """
 )
 
-FAKE_ORAS = textwrap.dedent(
+FAKE_GH = textwrap.dedent(
     """\
     #!/usr/bin/env python3
     import json, os, shutil, sys
     store = os.environ["FAKE_STORE"]
     args = sys.argv[1:]
     with open(os.path.join(store, "calls.log"), "a") as log:
-        log.write(json.dumps(["oras", *args]) + "\\n")
-    if os.environ.get("FAKE_ORAS_UNAUTH"):
-        sys.exit("Error response from registry: unauthorized: authentication required")
-    source = os.path.join(store, "blobs", args[-1].split("@sha256:")[1])
+        log.write(json.dumps(["gh", *args]) + "\\n")
+    if os.environ.get("FAKE_GH_UNAUTH"):
+        sys.exit("HTTP 401: Bad credentials (https://api.github.com/graphql)")
+    source = os.path.join(store, args[2], args[args.index("--pattern") + 1])
     if not os.path.exists(source):
-        sys.exit("Error response from registry: not found")
+        sys.exit("release not found")
     shutil.copy(source, args[args.index("--output") + 1])
     """
 )
@@ -70,9 +71,9 @@ class DownloadTest(unittest.TestCase):
         self.store = os.path.join(self.tmp, "store")
         bin_dir = os.path.join(self.tmp, "bin")
         for directory in (self.root, os.path.join(self.store, "release"),
-                          os.path.join(self.store, "blobs"), bin_dir):
+                          os.path.join(self.store, "unreleased"), bin_dir):
             os.makedirs(directory)
-        for name, body in (("curl", FAKE_CURL), ("oras", FAKE_ORAS)):
+        for name, body in (("curl", FAKE_CURL), ("gh", FAKE_GH)):
             exe = os.path.join(bin_dir, name)
             with open(exe, "w") as file:
                 file.write(body)
@@ -84,10 +85,9 @@ class DownloadTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        # a.jsonl is released; b.jsonl is uploaded to ghcr.io but not released.
+        # a.jsonl is released; b.jsonl is staged on the unreleased draft.
         self.publish("a.jsonl", FILE_A)
-        self.blob(FILE_A)
-        self.blob(FILE_B)
+        self.stage("b.jsonl", FILE_B)
         self.write_manifest([
             self.entry("a.jsonl", FILE_A, "https://example.com/releases/download/0.1.1/a.jsonl"),
             self.entry("b.jsonl", FILE_B, None),
@@ -97,7 +97,7 @@ class DownloadTest(unittest.TestCase):
 
     def entry(self, name, data, url):
         return {"name": name, "size": len(data), "sha256": sha(data),
-                "tag": url and "0.1.1", "url": url, "oci": f"ghcr.io/owner/repo/{name}"}
+                "tag": url and "0.1.1", "url": url}
 
     def write_manifest(self, entries):
         with open(os.path.join(self.root, "manifest.json"), "w") as file:
@@ -107,8 +107,8 @@ class DownloadTest(unittest.TestCase):
         with open(os.path.join(self.store, "release", name), "wb") as file:
             file.write(data)
 
-    def blob(self, data):
-        with open(os.path.join(self.store, "blobs", sha(data)), "wb") as file:
+    def stage(self, name, data):
+        with open(os.path.join(self.store, "unreleased", name), "wb") as file:
             file.write(data)
 
     def local(self, name):
@@ -162,14 +162,12 @@ class DownloadTest(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(os.path.join(self.root, "senzing-ready"))),
                          ["a.jsonl", "b.jsonl"])
 
-    def test_released_entry_uses_url_and_unreleased_uses_oras(self):
+    def test_released_entry_uses_url_and_unreleased_uses_staging_draft(self):
         self.download()
-        tools = {call[-1].rsplit("/", 1)[-1].split("@")[0]: call[0] for call in self.calls()}
-        self.assertEqual(tools["a.jsonl"], "curl")
-        self.assertEqual(tools["b.jsonl"], "oras")
-        oras = [call for call in self.calls() if call[0] == "oras"][0]
-        self.assertEqual(oras[1:4], ["blob", "fetch", "--output"])
-        self.assertEqual(oras[-1], f"ghcr.io/owner/repo/b.jsonl@sha256:{sha(FILE_B)}")
+        tools = {call[0] for call in self.calls()}
+        self.assertEqual(tools, {"curl", "gh"})
+        gh = [call for call in self.calls() if call[0] == "gh"][0]
+        self.assertEqual(gh[1:6], ["release", "download", "unreleased", "--pattern", "b.jsonl"])
         curl = [call for call in self.calls() if call[0] == "curl"][0]
         self.assertEqual(curl[1], "-fsSL")
         self.assertEqual(curl[-1], "https://example.com/releases/download/0.1.1/a.jsonl")
@@ -227,25 +225,14 @@ class DownloadTest(unittest.TestCase):
         self.assertIn("failed: a.jsonl: curl: (22)", output)
         self.assertEqual(sorted(os.listdir(os.path.join(self.root, "senzing-ready"))), ["b.jsonl"])
 
-    def test_oras_login_failure_fails_only_ghcr_entries(self):
-        with mock.patch.dict(os.environ, {"FAKE_ORAS_UNAUTH": "1"}):
+    def test_gh_login_failure_fails_only_unreleased_entries(self):
+        with mock.patch.dict(os.environ, {"FAKE_GH_UNAUTH": "1"}):
             code, output = self.download()
         self.assertEqual(code, 1)
         self.assertEqual(self.local("a.jsonl"), FILE_A)
         self.assertIsNone(self.local("b.jsonl"))
-        self.assertIn("failed: b.jsonl: Error response from registry: unauthorized", output)
-        self.assertIn("oras login ghcr.io", output)
-
-    def test_missing_oras_fails_only_ghcr_entries(self):
-        os.remove(os.path.join(self.tmp, "bin", "oras"))
-        bin_dir = os.path.join(self.tmp, "bin")
-        # Keep python3 for the fake curl, but not the real oras in ~/.local/bin.
-        path = bin_dir + os.pathsep + os.path.dirname(sys.executable)
-        with mock.patch.dict(os.environ, {"PATH": path}):
-            code, output = self.download()
-        self.assertEqual(code, 1)
-        self.assertEqual(self.local("a.jsonl"), FILE_A)
-        self.assertIn("failed: b.jsonl: oras is not on PATH", output)
+        self.assertIn("failed: b.jsonl: HTTP 401: Bad credentials", output)
+        self.assertIn("gh auth login", output)
 
     def test_files_not_in_manifest_are_left_alone(self):
         self.write_local("notes.jsonl", b'{"x": 1}\n')

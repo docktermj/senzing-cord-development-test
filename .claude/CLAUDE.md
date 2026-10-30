@@ -18,13 +18,15 @@ changing anything about storage. In short:
 - **Each file is a GitHub Release asset** of the Release where it last changed. That gives
   it a public `curl` URL, the entry's `url` in `manifest.json`:
   `https://github.com/docktermj/senzing-cord-development-test/releases/download/<tag>/<file>`.
-- **Each file also has its own `ghcr.io` repository,**
-  `ghcr.io/docktermj/senzing-cord-development-test/<name>`, pushed with ORAS under the tag
-  `sha256-<hex>`. The layer digest equals the file's SHA-256. The `v0.1.0` proof of concept
-  used a single artifact, `…/senzing-cord-development-test:v0.1.0`, which is kept as
-  history.
+- **Unreleased files are staged on a draft Release tagged `unreleased`.** `/release-cord`
+  renames it to the version it releases, so the files are never uploaded twice. A draft is
+  visible only to the repository's writers. Each asset's `digest` is checked against the
+  manifest's `sha256`.
+- **`ghcr.io` is no longer used** (issue #26). Its packages, from the `v0.1.0` proof of
+  concept and the per-file repositories `ghcr.io/docktermj/senzing-cord-development-test/<name>`,
+  are kept as history.
 - **`manifest.json` is the source of truth in git.** It has one entry per file: `name`,
-  `size`, `sha256`, `tag`, `url`, `oci` (the per-file repository) and an optional `source`.
+  `size`, `sha256`, `tag`, `url` and an optional `source`.
   `tag` and `url` are `null` until the file is released. A data change is a PR that edits
   it.
 - **Versions are bare SemVer tags** (`0.2.0`), each a Release holding only the files new or
@@ -34,24 +36,25 @@ changing anything about storage. In short:
 
 ## Commands
 
-`/upload-senzing-ready` (`.claude/skills/upload-senzing-ready/`) pushes new and changed
-`senzing-ready/*.jsonl` files and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
+`/upload-senzing-ready` (`.claude/skills/upload-senzing-ready/`) uploads new and changed
+`senzing-ready/*.jsonl` files to the `unreleased` draft and updates `manifest.json` and the `[Unreleased]` section of `CHANGELOG.md`. It commits
 nothing. `/release-cord` (`.claude/skills/release-cord/`) publishes them:
 
-- it first runs the upload itself (`release_cord.py upload`): a preview, then the push, stopping
+- it first runs the upload itself (`release_cord.py upload`): a preview, then the upload, stopping
   on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
-- it builds a draft Release of the new and changed files, and a `release-<version>` PR that
+- it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
   also rewrites the `## CORDs` lists in `README.md` and the files' rows in `CORD_stats.xlsx`
   (through `bin/get_cord_stats.py`);
 - it asks before merging;
-- it then tags `ghcr.io` and publishes the draft on the merge commit.
+- it then publishes the draft on the merge commit.
 
 `/download-senzing-ready` (`.claude/skills/download-senzing-ready/`) fills `senzing-ready/` from the
 manifest. All three stop if only an old `jsonl/` directory exists; move it with
 `mv jsonl senzing-ready`.
 
-- released files come from their Release URL, and unreleased ones from `ghcr.io`;
+- released files come from their Release URL, and unreleased ones from the `unreleased`
+  draft (which needs `gh auth login`);
 - each file's SHA-256 is checked;
 - a locally modified file is kept unless named with `--force <name>`.
 
@@ -70,38 +73,22 @@ region to its README heading. `/upload-senzing-ready` refuses other names, and `
 applies the same check. The only Python dependency, `openpyxl`, is in `pyproject.toml`
 (`pip install .`).
 
-The document's "Proof of concept" section has the full publish and download commands for
-`v0.1.0`.
-
 ```bash
-# Publish a file under a new tag. Run from the directory that holds it: ORAS rejects absolute paths.
-gh release create <tag> <file> --title "CORD data <tag>" --notes "..."
-gh auth token | oras login ghcr.io -u docktermj --password-stdin   # needs write:packages
-oras push ghcr.io/docktermj/senzing-cord-development-test:<tag> \
-  --artifact-type application/vnd.senzing.cord.v1 \
-  --annotation org.opencontainers.image.source=https://github.com/docktermj/senzing-cord-development-test \
-  <file>:application/x-ndjson
-
 # Verify: each must print the manifest's sha256
 curl -fsSL https://senzing.com/datasets/<file> | sha256sum
 curl -fsSL <release-url> | sha256sum
-oras blob fetch --output - ghcr.io/docktermj/senzing-cord-development-test@sha256:<sha256> | sha256sum
 
-# List the ghcr.io tags of every file in the manifest
-for oci in $(jq -r '.files[].oci' manifest.json); do
-  echo "$oci: $(oras repo tags "$oci" | tr '\n' ' ')"
-done
+# The digest of every asset on the staging draft
+gh release view unreleased --json assets --jq '.assets[] | "\(.name) \(.digest)"'
 
 markdownlint README.md docs/*.md   # MD013 (line length) is known to fail; there is no lint config
 ```
 
 ## Constraints
 
-- **The `ghcr.io` package is private.** Making it public is UI-only and can't be undone, so
-  don't do it without an explicit decision.
 - **Don't change upstream.** Don't change links on the CORD page
   (<https://senzing.com/senzing-ready-data-collections-cord/>), and don't remove anything from
   `https://senzing.com/datasets/`. Moving the other 19 files and updating those links is
   follow-up work.
-- **Check SHA-256 on every publish.** A Release asset must match the copy on senzing.com, the
-  `ghcr.io` blob and the manifest entry.
+- **Check SHA-256 on every publish.** A Release asset must match the copy on senzing.com and
+  the manifest entry.

@@ -3,12 +3,12 @@
 
 The release-cord skill runs the subcommands in order, asking the user between them:
 
-  upload            push new and changed senzing-ready/ files (/upload-senzing-ready),
+  upload            upload new and changed senzing-ready/ files (/upload-senzing-ready),
                     after printing a preview; skipped while a draft is being resumed
   status            report the version, the suggested bump, a draft to resume, and blockers
-  prepare --bump B  draft Release with the new and changed files; update README.md and
-                    CORD_stats.xlsx; branch, commit, push and PR
-  publish           merge the PR, tag ghcr.io, publish the draft, verify downloads
+  prepare --bump B  turn the "unreleased" staging draft into the version's draft Release;
+                    update README.md and CORD_stats.xlsx; branch, commit, push and PR
+  publish           merge the PR, publish the draft, verify downloads
 
 Every step can be rerun. A draft Release above the latest version is resumed.
 Exit codes: 0 success, 1 upload refused or failed, or verification failed, 2 stopped.
@@ -255,11 +255,14 @@ class Context:
         """The files this release attaches: pending, or already tagged by a resumed run."""
         return [e for e in self.manifest["files"] if e.get("tag") in (None, version)]
 
-    def missing_blobs(self):
+    def missing_assets(self, tag):
+        """Pending files that the draft Release tag lacks, or holds with another SHA-256."""
+        release = upload.release_assets(f"{self.owner}/{self.repo}", tag)
+        assets = release[1] if release else {}
         return [
             e["name"]
             for e in self.manifest["files"]
-            if not upload.tag_exists(f"{e['oci']}:sha256-{e['sha256']}")
+            if e.get("tag") in (None, tag) and assets.get(e["name"]) != e["sha256"]
         ]
 
     def pull_request(self, version):
@@ -293,9 +296,12 @@ def blockers(ctx):
         problems.append("nothing to release: [Unreleased] is empty and every file is released")
     if not ctx.manifest["files"]:
         problems.append("manifest.json lists no files")
-    missing = ctx.missing_blobs()
-    if missing:
-        problems.append(f"no ghcr.io sha256 tag for: {', '.join(missing)}")
+    if ctx.pending_entries() or ctx.draft():
+        tag = ctx.draft() or upload.STAGING
+        missing = ctx.missing_assets(tag)
+        if missing:
+            problems.append(f"not in draft Release {tag} with a matching digest: "
+                            f"{', '.join(missing)}; run /upload-senzing-ready")
     return problems
 
 
@@ -352,8 +358,8 @@ def upload_step(ctx, out):
     return upload.run(ctx.root, [], dry_run=False, out=out, repo=repo)
 
 
-def gather_assets(ctx, entries, directory):
-    """Copy or fetch each entry's file into directory, checking each SHA-256."""
+def gather_assets(ctx, version, entries, directory):
+    """Copy each entry's file into directory, from senzing-ready/ or the version's draft."""
     paths = []
     for entry in entries:
         local = os.path.join(ctx.root, "senzing-ready", entry["name"])
@@ -361,8 +367,8 @@ def gather_assets(ctx, entries, directory):
         if os.path.isfile(local) and upload.sha256_and_size(local)[0] == entry["sha256"]:
             shutil.copyfile(local, target)
         else:
-            run("oras", "blob", "fetch", "--output", target,
-                f"{entry['oci']}@sha256:{entry['sha256']}")
+            run("gh", "release", "download", version, "--repo", f"{ctx.owner}/{ctx.repo}",
+                "--pattern", entry["name"], "--output", target, "--clobber")
         if upload.sha256_and_size(target)[0] != entry["sha256"]:
             raise StopError(f"{entry['name']}: SHA-256 does not match manifest.json")
         paths.append(target)
@@ -404,28 +410,35 @@ def prepare(ctx, bump, out):
         if problems:
             raise StopError("; ".join(problems))
 
-    # Step 3: draft Release holding the new and changed files.
+    # Step 3: the staging draft becomes the version's draft, holding only the new and
+    # changed files. Renaming it moves the assets without uploading them again.
     entries = ctx.release_entries(version)
+    repo = f"{ctx.owner}/{ctx.repo}"
     with tempfile.TemporaryDirectory() as directory:
         if not ctx.draft():
-            paths = gather_assets(ctx, entries, directory)
-            run("gh", "release", "create", version, "--draft", "--title", version,
-                "--notes", release_notes(ctx.owner, ctx.repo, version, date), *paths,
-                cwd=ctx.root)
-        else:
-            assets = gh_json(ctx.root, "release", "view", version, "--json", "assets")
-            have = {(a["name"], a["size"]) for a in assets["assets"]}
-            want = [e for e in entries if (e["name"], e["size"]) not in have]
-            if want:
-                paths = gather_assets(ctx, want, directory)
-                run("gh", "release", "upload", version, *paths, "--clobber", cwd=ctx.root)
+            if upload.staged_assets(ctx.root, repo) is None:
+                names = ", ".join(e["name"] for e in entries) or "no files"
+                raise StopError(f"no {upload.STAGING} draft Release holds the pending files "
+                                f"({names}); run /upload-senzing-ready")
+            run("gh", "release", "edit", upload.STAGING, "--repo", repo, "--tag", version,
+                "--title", version, "--notes", release_notes(ctx.owner, ctx.repo, version, date))
+            ctx.releases.append({"tagName": version, "isDraft": True})
+        _, assets = upload.release_assets(repo, version)
+        wanted = {e["name"] for e in entries}
+        for name in sorted(set(assets) - wanted):
+            run("gh", "release", "delete-asset", version, name, "--repo", repo, "--yes")
+            print(f"deleted from draft: {name} (not a new or changed file)", file=out)
+        missing = ctx.missing_assets(version)
+        if missing:
+            raise StopError(f"draft Release {version} lacks a matching digest for: "
+                            f"{', '.join(missing)}")
         names = ", ".join(sorted(e["name"] for e in entries)) or "no files"
         print(f"draft: {version} holds {names}", file=out)
 
         # Step 4: stats, manifest, CHANGELOG and README on a branch, then the PR.
         if not (local_branch or remote_branch):
             # Stats come from the same bytes as the Release assets.
-            paths = gather_assets(ctx, entries, directory)
+            paths = gather_assets(ctx, version, entries, directory)
             text = read_changelog(ctx.root)
             added_names = {upload.line_name(line)
                            for line in unreleased_sections(text).get("Added", [])}
@@ -499,12 +512,7 @@ def publish(ctx, out):
     upload.git(ctx.root, "fetch", "--quiet", "origin")
     manifest = json.loads(upload.git(ctx.root, "show", f"{sha}:manifest.json"))
 
-    # Step 6: ghcr.io version tags.
-    for entry in manifest["files"]:
-        run("oras", "tag", f"{entry['oci']}:sha256-{entry['sha256']}", version)
-        print(f"tagged: {entry['oci']}:{version}", file=out)
-
-    # Step 7: publish the draft on the merge commit.
+    # Step 6: publish the draft on the merge commit.
     run("gh", "release", "edit", version, "--draft=false", "--target", sha, "--latest",
         cwd=ctx.root)
     print(f"published: {version} at {sha}", file=out)
@@ -513,7 +521,7 @@ def publish(ctx, out):
         upload.git(ctx.root, "switch", "--quiet", BASE)
         upload.git(ctx.root, "merge", "--quiet", "--ff-only", f"origin/{BASE}")
 
-    # Step 8: verify the URL of every file this Release holds.
+    # Step 7: verify the URL of every file this Release holds.
     failed = 0
     for entry in (e for e in manifest["files"] if e.get("tag") == version):
         actual = sha256_of_url(entry["url"])

@@ -2,8 +2,8 @@
 """Download every file in manifest.json into senzing-ready/, checking each SHA-256.
 
 Released entries come from their public Release URL; unreleased entries (url
-null) come from ghcr.io with oras. A current file is skipped, and a file whose
-SHA-256 differs is kept unless named with --force.
+null) come from the "unreleased" staging draft Release with gh. A current file
+is skipped, and a file whose SHA-256 differs is kept unless named with --force.
 
 Exit codes: 0 senzing-ready/ matches the manifest, 1 some entries failed or are
 locally modified, 2 stopped before downloading anything.
@@ -22,22 +22,23 @@ import upload_senzing_ready as upload  # noqa: E402
 from upload_senzing_ready import StopError  # noqa: E402
 
 
-def fetch(entry, target):
+def fetch(root, entry, target):
     """Download entry to target; return an error message, or None."""
     if entry.get("url"):
         command = ["curl", "-fsSL", "-o", target, entry["url"]]
     else:
-        command = ["oras", "blob", "fetch", "--output", target,
-                   f"{entry['oci']}@sha256:{entry['sha256']}"]
+        command = ["gh", "release", "download", upload.STAGING, "--pattern", entry["name"],
+                   "--output", target, "--clobber"]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        result = subprocess.run(command, capture_output=True, text=True, cwd=root, check=False)
     except FileNotFoundError:
         return f"{command[0]} is not on PATH"
     if result.returncode == 0:
         return None
     error = result.stderr.strip() or f"{command[0]} exited with {result.returncode}"
-    if command[0] == "oras" and re.search(r"unauthorized|denied", error, re.IGNORECASE):
-        error += "\nLog in with: gh auth token | oras login ghcr.io -u <user> --password-stdin"
+    if command[0] == "gh" and re.search(r"40[134]|auth|credentials|not found", error, re.I):
+        error += ("\nThe staging draft is visible only to the repository's writers; "
+                  "log in with: gh auth login")
     return error
 
 
@@ -67,7 +68,7 @@ def run(root, force, out=None):
         temp = os.path.join(ready_dir, f".{name}.part")
         print(f"downloading {name} ({entry['size']:,} bytes)", file=out, flush=True)
         try:
-            error = fetch(entry, temp)
+            error = fetch(root, entry, temp)
             if error is None and upload.sha256_and_size(temp)[0] != entry["sha256"]:
                 error = "SHA-256 does not match manifest.json"
             if error is None:

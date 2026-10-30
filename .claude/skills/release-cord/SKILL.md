@@ -1,6 +1,6 @@
 ---
 name: release-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, ghcr.io version tags, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /release-cord; it runs the /upload-senzing-ready push itself first. Asks for the SemVer bump and before merging.
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, README.md and CORD_stats.xlsx updates merged into main. Use when the user runs /release-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
@@ -14,8 +14,8 @@ answer: the SemVer bump, and whether to merge.
 - If only an old `jsonl/` directory exists, the script stops with exit 2 and prints
   `mv jsonl senzing-ready`. Show that to the user; don't move it yourself.
 - Never merge without the user's explicit yes in step 5, in this run.
-- Never delete a draft Release, branch, tag or package, and never change package visibility.
-  When a step stops, leave things as they are; a rerun resumes from the draft.
+- Never delete a draft Release, branch or tag. When a step stops, leave things as they
+  are; a rerun resumes from the draft.
 
 ## Steps
 
@@ -26,15 +26,14 @@ answer: the SemVer bump, and whether to merge.
    ```
 
    This runs `/upload-senzing-ready` without asking: it prints a `preview:` of what it would
-   push, then pushes new and changed `senzing-ready/` files to `ghcr.io` and records them in
-   `manifest.json` and `[Unreleased]`. Large files take minutes.
+   upload, then uploads new and changed `senzing-ready/` files to the `unreleased` staging
+   draft Release and records them in `manifest.json` and `[Unreleased]`. Large files take
+   minutes.
    - **`skipped: resuming draft <version>`:** a release is already in progress; go on.
    - **Exit 1:** show the `refused:` and `failed:` lines and stop. A refused file was found
-     in the preview, so nothing was pushed; a failed push leaves the other files pushed, and a
-     rerun retries it.
-   - **Exit 2:** show the message, usually the `write:packages` fix
-     (`gh auth refresh -h github.com -s write:packages`, then
-     `gh auth token | oras login ghcr.io -u <user> --password-stdin`), and stop.
+     in the preview, so nothing was uploaded; a failed upload leaves the other files
+     uploaded, and a rerun retries it.
+   - **Exit 2:** show the message, usually the `gh auth login` fix, and stop.
 
    Removing a file is not part of a release: run `/upload-senzing-ready --remove <name>`
    first.
@@ -47,8 +46,8 @@ answer: the SemVer bump, and whether to merge.
 
    - **Exit 2:** show each `blocking:` line and stop.
      - "Nothing to release" means nothing in `senzing-ready/` is new or changed.
-     - A missing `sha256` tag means rerunning `/upload-senzing-ready` with the file in
-       `senzing-ready/`.
+     - "not in draft Release … with a matching digest" means rerunning
+       `/upload-senzing-ready` with the file in `senzing-ready/`.
      - "region … has no README heading" means adding the region to `REGIONS` in
        `upload_senzing_ready.py`; "expected <source>-<region>.jsonl" means renaming the file.
      - "needs openpyxl" means running `pip install openpyxl`, or `pip install .` from the
@@ -68,10 +67,12 @@ answer: the SemVer bump, and whether to merge.
    ```
 
    This step:
-   - creates the draft Release `<version>` holding the new and changed files (`tag: null` in
-     `manifest.json`), taking each from `senzing-ready/` when its SHA-256 matches and from
-     `ghcr.io` otherwise;
-   - runs `bin/get_cord_stats.py` on those same files to update `CORD_stats.xlsx`;
+   - renames the `unreleased` staging draft to the draft Release `<version>`, so the new and
+     changed files (`tag: null` in `manifest.json`) move with it without being uploaded again;
+   - deletes any asset of that draft that isn't a new or changed file, and stops if a new or
+     changed file is missing or its `digest` doesn't match `manifest.json`;
+   - runs `bin/get_cord_stats.py` on those same files to update `CORD_stats.xlsx`, taking each
+     from `senzing-ready/` when its SHA-256 matches and from the draft otherwise;
    - commits `manifest.json`, `CHANGELOG.md`, `README.md` and `CORD_stats.xlsx` on the
      branch `release-<version>`;
    - pushes the branch and opens the PR.
@@ -79,21 +80,20 @@ answer: the SemVer bump, and whether to merge.
    Report the `pull request:` URL. Exit 2 means it stopped; show the message. A rerun (go back
    to step 1) resumes the draft.
 
-5. Show the PR and ask: "Merge `<PR URL>` with `--merge --delete-branch`, then tag
-   `ghcr.io` and publish `<version>`?" Wait for an explicit yes.
-   - **No:** say that the draft Release and the branch are left in place, that no
-     `ghcr.io` tag was added, and that `/release-cord` resumes later. Stop.
+5. Show the PR and ask: "Merge `<PR URL>` with `--merge --delete-branch`, then publish
+   `<version>`?" Wait for an explicit yes.
+   - **No:** say that the draft Release and the branch are left in place, and that
+     `/release-cord` resumes later. Stop.
    - **Yes:** run:
 
      ```bash
      python3 .claude/skills/release-cord/release_cord.py publish
      ```
 
-     This step merges the PR, tags every file's `ghcr.io` repository with `<version>`,
-     publishes the draft on the merge commit as the latest Release, switches the clone to an
+     This step merges the PR, publishes the draft on the merge commit as the latest Release, switches the clone to an
      updated `main`, and downloads each file in the Release to check its SHA-256.
 
-6. Report the merge commit, the `tagged:` and `published:` lines, and each `verified:` line.
+6. Report the merge commit, the `published:` line, and each `verified:` line.
    Exit 1 means a download didn't match `manifest.json`: list the `MISMATCH:` lines and
    leave the Release as it is for the user to look at. Exit 2 means it stopped before
    publishing, for example because branch protection refused the merge. Show the message;
@@ -101,8 +101,8 @@ answer: the SemVer bump, and whether to merge.
 
 ## What a release changes
 
-- **Release:** `<version>`, holding only the files that are new or changed since the last
-  release. Its notes are exactly
+- **Release:** `<version>`, the former `unreleased` staging draft, holding only the files
+  that are new or changed since the last release. Its notes are exactly
   `See [CHANGELOG.md](https://github.com/<owner>/<repo>/blob/main/CHANGELOG.md#<anchor>)`.
   `<anchor>` is GitHub's anchor for `[<version>] - YYYY-MM-DD`: brackets and dots dropped,
   spaces turned to hyphens, so `[0.2.0] - 2026-10-28` gives `020---2026-10-28`.
@@ -123,7 +123,6 @@ answer: the SemVer bump, and whether to merge.
   empty `## [Unreleased]`. The link definitions get `[Unreleased]` comparing
   `<version>...HEAD`, and `[<version>]` comparing the previous tag with `<version>`. The file
   is created with the Keep a Changelog header if it is missing.
-- **`ghcr.io`:** `oras tag <oci>:sha256-<hex> <version>` for every entry, after the merge.
 
 ## Tests
 
@@ -131,6 +130,6 @@ answer: the SemVer bump, and whether to merge.
 python3 -m unittest discover -s .claude/skills/release-cord -p 'test_*.py'
 ```
 
-The tests use fake `gh`, `oras`, `curl` and stats-script executables and a local bare
+The tests use fake `gh`, `curl` and stats-script executables and a local bare
 repository as `origin`, so they need no network. `bin/test_get_cord_stats.py` tests the stats
 script against a small workbook, and is skipped without `openpyxl`.

@@ -5,19 +5,21 @@ copied from senzing-garage/cord-development#4.
 
 ## Decision
 
-Publish each CORD JSONL file **two ways, both recorded in a manifest in git**:
+Publish each CORD JSONL file as a **GitHub Release asset, recorded in a manifest in git**.
+This gives every file a stable public HTTPS URL that downloads with `curl` and no
+authentication.
 
-1. As a **GitHub Release asset**. This gives every file a stable public HTTPS URL that downloads
-   with `curl` and no authentication.
-2. As a layer of an **OCI artifact in `ghcr.io`**, pushed with [ORAS]. This is the copy for
-   automation: it is addressed by the file's SHA-256 and stored once however many versions
-   contain it.
+Before it is released, a file is staged on a **draft Release tagged `unreleased`**.
+`/release-cord` renames that draft to the version it releases, so a file is uploaded once.
+Each asset's `digest` is checked against the manifest's SHA-256.
 
 `manifest.json` at the repository root holds one entry per file, giving its name, size in
-bytes, SHA-256, Release tag, download URL and OCI reference. A data change is a pull request
-that edits the manifest.
+bytes, SHA-256, Release tag and download URL. A data change is a pull request that edits the
+manifest.
 
-The reasons are in [Why this combination](#why-this-combination).
+The reasons are in [Why this approach](#why-this-approach). Each file was at first also
+published to `ghcr.io` (approach 4); [Dropping `ghcr.io`](#dropping-ghcrio) says why that
+stopped.
 
 ## Context
 
@@ -117,7 +119,7 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 - **Capacity:** yes, without splitting. "The Container registry has a 10 GB size limit for each
   layer", and "a 10 minute timeout limit for uploads". Pushing `opendata-lasvegas.jsonl` within
   that timeout takes about 1.6 MB/s of sustained upload.
-- **Content addressing:** ORAS stores a file unchanged as a layer whose digest is the file's
+- **Content addressing:** [ORAS] stores a file unchanged as a layer whose digest is the file's
   SHA-256. A file that is the same in two versions is stored once, and the manifest's `sha256`
   is the blob address.
 - **PR diff, checkout, history:** the same as approach 3.
@@ -163,7 +165,7 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
 | `actions/checkout` fetches committed data | Yes, unless sparse | Yes, unless sparse | No | No | Yes, unless sparse |
 | Pages already serves `main:/docs` (legacy Jekyll build) | Data would share `docs/` with the reference documents | Unaffected | Unaffected | Unaffected | Unaffected |
 
-## Why this combination
+## Why this approach
 
 - **Only approaches 3 and 5 meet the hard requirement:** a stable public `curl` URL for all 21
   files. Approaches 1 and 2 can't hold the two large files. Approach 4 needs a token request
@@ -172,21 +174,35 @@ pass GitHub's recommendation that repositories stay "ideally less than 1 GB".
   to the history `git clone` downloads, and keeps the data out of `actions/checkout`. Approach 5
   buys record-level pull request diffs, but at 1.68 GB in the tree, a repository over GitHub's
   recommended size, and about 1 GB of history for a small edit to the largest file.
-- **Approach 4 adds what automation needs.** The manifest's `sha256` is the address of the
-  exact bytes, so a workflow fetches what the manifest names and can't silently get a
-  replacement asset. Unchanged files are stored once across versions, and `oras pull` fetches
-  a whole version in one command.
-- **Combined, they meet the issue's condition:** every file still has a stable public HTTPS URL
-  that downloads with `curl` and no authentication. That URL is the Release asset, so the
-  `ghcr.io` copy can stay private until there is a reason to make it public.
 - **The cost is that pull requests show manifest changes, not record changes.** Reviewing the
   records themselves is left to the data-quality gate tracked by
   senzing-garage/cord-development#1.
 
+### Dropping `ghcr.io`
+
+Until [issue #26](https://github.com/docktermj/senzing-cord-development-test/issues/26), each
+file was also pushed to its own `ghcr.io` repository as approach 4. That was meant to add what
+automation needs. By then, Releases gave each of those things, or the copy no longer gave it:
+
+- **Content addressing.** `/download-senzing-ready` checks every file's SHA-256 against the
+  manifest, so a replaced asset is detected. Release assets also report a `digest`.
+- **Storing unchanged files once.** Each Release holds only the files new or changed in it.
+- **One command per version.** With a repository per file, `oras pull` fetched one file, the
+  same as `curl`.
+- **A copy for automation.** The package was private, so it needed a token. Release URLs
+  need none.
+
+Its one remaining job was holding uploaded files until they were released. The `unreleased`
+draft Release does that. Dropping `ghcr.io` removed a second upload of every file, the ORAS
+and `write:packages` requirements, and the open question of making the package public. No
+consumer depended on it. The existing packages are kept as history, and the manifest no
+longer has an `oci` field.
+
 ## Proof of concept
 
 `gleif-london.jsonl` (45,162,274 bytes, under the 100 MiB limit) is published in this repository
-under the version tag `v0.1.0`.
+under the version tag `v0.1.0`. This records how the proof of concept was published, including
+the `ghcr.io` copy that was later dropped.
 
 | | Value |
 | --- | --- |
