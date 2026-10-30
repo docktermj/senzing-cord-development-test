@@ -1,0 +1,46 @@
+name: Submit a CORD file
+description: Hand over a new or changed CORD JSONL file without write access to this repository.
+title: "Submit CORD: <source>-<region>.jsonl"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Host the file at a public download link, then fill in the fields below. A writer
+        downloads it, checks its size and SHA-256 against this issue, and publishes it.
+        The README's
+        [Submit a CORD without write access](https://github.com/docktermj/senzing-cord-development-test#submit-a-cord-without-write-access)
+        has the steps.
+  - type: input
+    id: file-name
+    attributes:
+      label: File name
+      description: "`<source>-<region>.jsonl`, in lowercase, with a region already listed under CORDs in the README."
+      placeholder: gleif-london.jsonl
+    validations:
+      required: true
+  - type: input
+    id: download-url
+    attributes:
+      label: Download URL
+      description: >-
+        A public HTTPS URL that `curl -fsSL` downloads without authentication. A Release asset
+        on your fork of this repository works, and takes files up to 2 GiB.
+      placeholder: https://github.com/<you>/senzing-cord-development-test/releases/download/<tag>/gleif-london.jsonl
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: Size in bytes
+      description: "The output of `stat -c %s <file>`."
+      placeholder: "45162274"
+    validations:
+      required: true
+  - type: input
+    id: sha256
+    attributes:
+      label: SHA-256
+      description: "The output of `sha256sum <file>`."
+      placeholder: 46d2f256f5c4c3c0aa5f7d0b01b90b9eb139bd4b97251e6d1ebf6ad99890cf55
+    validations:
+      required: true
