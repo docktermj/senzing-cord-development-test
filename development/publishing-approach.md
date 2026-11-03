@@ -45,9 +45,9 @@ A writer to this repository, in Claude Code:
 
 A contributor without write access opens a **Submit a CORD file** issue, from
 `.github/ISSUE_TEMPLATE/submit-cord.yml`. It gives the file name, a public download URL, the
-size in bytes and the SHA-256. The README's
-[Submit a CORD without write access](../README.md#submit-a-cord-without-write-access) has the
-contributor's steps. A writer, in a clone:
+size in bytes and the SHA-256.
+[Submit a CORD without write access](submit-without-write-access.md) has the contributor's
+steps. A writer, in a clone:
 
 1. **Downloads** the file: `curl -fsSL -o senzing-ready/<name> <url>`.
 2. **Checks** that `stat -c %s senzing-ready/<name>` and `sha256sum senzing-ready/<name>` print

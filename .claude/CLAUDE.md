@@ -10,7 +10,7 @@ Collections of Relatable Data (CORD): 21 JSONL files, about 1.68 GB in all, serv
 
 ## How the data is published
 
-`docs/publishing-approach.md` records the decision and its reasoning. Read it before
+`development/publishing-approach.md` records the decision and its reasoning. Read it before
 changing anything about storage. In short:
 
 - **The data files never go in git.** Two of them are over GitHub's 100 MiB limit, and
@@ -104,7 +104,7 @@ gh release view unreleased --json assets --jq '.assets[] | "\(.name) \(.digest)"
 
 # Lint, as CI does (.markdownlint.json: MD013 and MD041 off, MD024 siblings_only;
 # .markdownlintignore skips .claude/worktrees/). Quote the globs so markdownlint expands them.
-markdownlint README.md CHANGELOG.md 'docs/*.md' '.claude/*.md' '.claude/**/*.md'
+markdownlint README.md CHANGELOG.md 'docs/*.md' 'development/*.md' '.claude/*.md' '.claude/**/*.md'
 ```
 
 ## Constraints
