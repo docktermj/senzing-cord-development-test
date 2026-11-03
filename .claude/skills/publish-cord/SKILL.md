@@ -1,6 +1,6 @@
 ---
 name: publish-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, docs/cords.md and development/CORD_stats.xlsx/.csv updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, development/cords.json, GitHub Pages catalog (docs/index.html, docs/cords.html, docs/cords.md) and development/CORD_stats.xlsx/.csv updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
@@ -52,6 +52,9 @@ answer: the SemVer bump, and whether to merge.
        `upload_senzing_ready.py`; "expected `<source>-<region>.jsonl`" means renaming the file.
      - "needs openpyxl" means running `pip install openpyxl`, or `pip install .` from the
        repository root.
+     - "no entry in development/cords.json" means adding the file's entry to
+       `development/cords.json` (see `docs/cords.html` below). It may stay uncommitted;
+       `prepare` commits it.
    - **`draft: <version> (resume)`:** say so, skip the bump question, and go to the step that
      `next:` names (`prepare` is step 4, `publish` is step 5).
 
@@ -74,9 +77,10 @@ answer: the SemVer bump, and whether to merge.
    - runs `bin/get_cord_stats.py` on those same files to update `development/CORD_stats.xlsx`
      and `development/CORD_stats.csv`, taking each
      from `senzing-ready/` when its SHA-256 matches and from the draft otherwise;
-   - commits `manifest.json`, `CHANGELOG.md`, `docs/cords.md`, `development/CORD_stats.xlsx` and
-     `development/CORD_stats.csv` on the
-     branch `release-<version>`;
+   - rewrites the GitHub Pages files `docs/index.html`, `docs/cords.html` and `docs/cords.md`;
+   - commits `manifest.json`, `CHANGELOG.md`, `development/cords.json`, those three Pages files,
+     `development/CORD_stats.xlsx` and `development/CORD_stats.csv` on the branch
+     `release-<version>`;
    - pushes the branch and opens the PR.
 
    Report the `pull request:` URL. Exit 2 means it stopped; show the message. A rerun (go back
@@ -111,15 +115,28 @@ answer: the SemVer bump, and whether to merge.
 - **`manifest.json`:** each new and changed entry gets `tag` `<version>` and
   `url` `https://github.com/<owner>/<repo>/releases/download/<version>/<name>`. Unchanged
   entries keep the `tag` and `url` of the Release where they last changed.
-- **`docs/cords.md`:** the CORD catalog, rewritten from `manifest.json` and served by GitHub
-  Pages from `main:/docs`. It has one `##` section per heading in `REGIONS` in
-  `upload_senzing_ready.py`, in alphabetical order; regions that share a heading (`london` and
-  `london_central_a` are both `London`) share one section. Each has a table of File (linked to its `url`), Version (`tag`), Size (bytes)
-  and SHA-256. Files with `tag` `null` are left out, and a heading with no released files
-  shows "Not published yet.". When `manifest.json` changes outside a release (for example
-  `/upload-senzing-ready --remove`), run
-  `python3 .claude/skills/publish-cord/publish_cord.py catalog` to rewrite it; it needs no
-  network or `gh`, and leaves a current file unchanged.
+- **`docs/index.html` and `docs/cords.html`:** the end-user landing page and CORD catalog that
+  GitHub Pages serves from `main:/docs` (`PAGES_URL` in `publish_cord.py`). They are generated
+  from `manifest.json`, `development/cords.json`, `REGIONS` in `upload_senzing_ready.py`,
+  `development/CORD_stats.csv` and `CHANGELOG.md`, never from the data files. The catalog has
+  one section per `REGIONS` heading, in alphabetical order, listing only released files (`tag`
+  not `null`) by name. Each entry shows the synopsis, locale, primary source, license, snapshot
+  date, version with its `CHANGELOG.md` date and link, size, record counts, SHA-256, a badge per
+  non-zero `*_FEATURES` column, `DATA_SOURCE`, download link and `curl` and `sha256sum`
+  commands, a collapsed sample record and the related CORDs in the same locale. A `null`
+  `cords.json` value shows as "Not stated".
+- **`docs/cords.md`:** a stub linking to `cords.html`. `docs/.nojekyll` keeps GitHub Pages from
+  running Jekyll.
+- **Rewriting the Pages files:** `python3 .claude/skills/publish-cord/publish_cord.py catalog`
+  rewrites all three, offline (no network or `gh`), and leaves current files unchanged. Run it
+  after any change to its inputs outside a release, such as a `cords.json` edit or
+  `/upload-senzing-ready --remove`. It stops, writing nothing, on a region missing from
+  `REGIONS`, a released file without a `cords.json` entry, a `CORD_stats.csv` row (matched on
+  `SOURCE` and `GEO`) or a `## [<tag>] - <date>` heading in `CHANGELOG.md`, and on a
+  `cords.json` entry without a `manifest.json` entry.
+- **`development/cords.json`:** hand-edited, keyed by file name: `synopsis`, `primary_source`
+  (`name` and `url`), `license`, `snapshot_date`, `data_source` and `sample_record`. A file
+  can't be released without an entry.
 - **`README.md`:** not changed; its `## CORDs` section links to the catalog.
 - **`development/CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
   file, matched on `SOURCE` and `GEO`. It sets the counts (a feature no longer present becomes
@@ -142,7 +159,8 @@ python3 -m unittest discover -s .claude/skills/publish-cord -p 'test_*.py'
 ```
 
 The tests use fake `gh`, `curl` and stats-script executables and a local bare
-repository as `origin`, so they need no network. They also fail when the committed
-`docs/cords.md` differs from what `manifest.json` gives.
+repository as `origin`, so they need no network. They also fail when a committed
+Pages file (`docs/index.html`, `docs/cords.html`, `docs/cords.md`) differs from what its inputs
+give.
 `bin/test_get_cord_stats.py` tests the stats script against a small workbook, and is skipped
 without `openpyxl`.

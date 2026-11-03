@@ -13,7 +13,7 @@ body:
     id: file-name
     attributes:
       label: File name
-      description: "`<source>-<region>.jsonl`, in lowercase, with a region already listed in the [CORD catalog](https://github.com/docktermj/senzing-cord-development-test/blob/main/docs/cords.md)."
+      description: "`<source>-<region>.jsonl`, in lowercase, with a region already listed in the [CORD catalog](https://hub.dockter.com/senzing-cord-development-test/cords.html)."
       placeholder: gleif-london.jsonl
     validations:
       required: true

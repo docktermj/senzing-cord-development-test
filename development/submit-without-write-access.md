@@ -4,7 +4,7 @@ Anyone with a GitHub account can hand over a new or changed file. A writer check
 publishes it.
 
 1. Name the file `<source>-<region>.jsonl`, in lowercase, such as `gleif-london.jsonl`. The
-   region, after the last hyphen, must be one of the region headings in the [CORD catalog](../docs/cords.md), written
+   region, after the last hyphen, must be one of the region headings in the [CORD catalog](https://hub.dockter.com/senzing-cord-development-test/cords.html), written
    without spaces, such as `lasvegas`; ask in an issue before using a new one. To replace a
    published file, keep its name.
 2. Host the file at a public HTTPS link that `curl -fsSL` downloads without authentication. A

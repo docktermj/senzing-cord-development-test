@@ -1,0 +1,431 @@
+{
+  "gleif-london.jsonl": {
+    "synopsis": "Legal Entity Identifier Dataset providing unique identification of legal entities participating in financial transactions.",
+    "primary_source": {
+      "name": "GLEIF (Global LEI)",
+      "url": "https://www.opensanctions.org/datasets/gleif/"
+    },
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "GLEIF",
+    "sample_record": {
+      "DATA_SOURCE": "GLEIF",
+      "RECORD_ID": "lei-03EINY24LQ6IXW124R72",
+      "RECORD_TYPE": "ORGANIZATION",
+      "LAST_CHANGE": "2024-07-10T08:08:08",
+      "NAMES": [
+        {
+          "NAME_TYPE": "PRIMARY",
+          "NAME_ORG": "THE BARCLAYS BANK UK RETIREMENT FUND"
+        }
+      ],
+      "ADDRESSES": [
+        {
+          "ADDR_FULL": "C/O BARCLAYS PENSION FUNDS TRUSTEES LIMITED, LONDON E14 5HP, GB-LND",
+          "ADDR_TYPE": "BUSINESS"
+        }
+      ],
+      "DATES": [
+        {
+          "REGISTRATION_DATE": "2012-09-24"
+        }
+      ],
+      "COUNTRIES": [
+        {
+          "REGISTRATION_COUNTRY": "gb"
+        }
+      ],
+      "IDENTIFIERS": [
+        {
+          "LEI_NUMBER": "03EINY24LQ6IXW124R72"
+        },
+        {
+          "OTHER_ID_TYPE": "OPEN_SANCTIONS",
+          "OTHER_ID_NUMBER": "lei-03EINY24LQ6IXW124R72"
+        }
+      ],
+      "URL": "https://www.opensanctions.org/entities/lei-03EINY24LQ6IXW124R72"
+    }
+  },
+  "ofac-london.jsonl": {
+    "synopsis": "Sanctions data from OFAC’s Specially Designated Nationals list. Includes names, addresses and countries of the respective entities.",
+    "primary_source": {
+      "name": "OFAC Specially Designated Nationals list",
+      "url": "https://sanctionslist.ofac.treas.gov/Home/SdnList"
+    },
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OFAC",
+    "sample_record": {
+      "DATA_SOURCE": "OFAC",
+      "RECORD_TYPE": "ORGANIZATION",
+      "RECORD_ID": "173",
+      "OFAC_ID": "173",
+      "PUBLISH_DATE": "12/11/2024",
+      "SDN_PROGRAM": "CUBA",
+      "NAME_LIST": [
+        {
+          "NAME_TYPE": "PRIMARY",
+          "NAME_ORG": "ANGLO-CARIBBEAN CO., LTD."
+        },
+        {
+          "NAME_TYPE": "AKA",
+          "NAME_ORG": "AVIA IMPORT"
+        }
+      ],
+      "ADDR_LIST": [
+        {
+          "ADDR_LINE1": "Ibex House, The Minories",
+          "ADDR_CITY": "London",
+          "ADDR_POSTAL_CODE": "EC3N 1DY",
+          "ADDR_COUNTRY": "United Kingdom"
+        }
+      ]
+    }
+  },
+  "ofac-moscow.jsonl": {
+    "synopsis": "Sanctions data from OFAC’s Specially Designated Nationals list. Includes names, addresses and countries of the respective entities.",
+    "primary_source": {
+      "name": "OFAC Specially Designated Nationals list",
+      "url": "https://sanctionslist.ofac.treas.gov/Home/SdnList"
+    },
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OFAC",
+    "sample_record": {
+      "DATA_SOURCE": "OFAC",
+      "RECORD_TYPE": "ORGANIZATION",
+      "RECORD_ID": "735",
+      "OFAC_ID": "735",
+      "PUBLISH_DATE": "12/11/2024",
+      "SDN_PROGRAM": "CUBA",
+      "NAME_LIST": [
+        {
+          "NAME_TYPE": "PRIMARY",
+          "NAME_ORG": "EMPRESA CUBANA DE AVIACION"
+        },
+        {
+          "NAME_TYPE": "AKA",
+          "NAME_ORG": "CUBANA AIRLINES"
+        }
+      ],
+      "ADDR_LIST": [
+        {
+          "ADDR_LINE1": "32 Main Street",
+          "ADDR_CITY": "Georgetown",
+          "ADDR_COUNTRY": "Guyana"
+        },
+        {
+          "ADDR_LINE1": "24 Rue Du Quatre Septembre",
+          "ADDR_CITY": "Paris",
+          "ADDR_COUNTRY": "France"
+        },
+        {
+          "ADDR_LINE1": "Belas Airport",
+          "ADDR_CITY": "Luanda",
+          "ADDR_COUNTRY": "Angola"
+        },
+        {
+          "ADDR_LINE1": "Dobrininskaya No. 7, Sec 5",
+          "ADDR_CITY": "Moscow",
+          "ADDR_COUNTRY": "Russia"
+        },
+        {
+          "ADDR_LINE1": "Corrientes 545 Primer Piso",
+          "ADDR_CITY": "Buenos Aires",
+          "ADDR_COUNTRY": "Argentina"
+        },
+        {
+          "ADDR_LINE1": "Frankfurter TOR 8-A",
+          "ADDR_CITY": "Berlin",
+          "ADDR_COUNTRY": "Germany"
+        },
+        {
+          "ADDR_LINE1": "1 Place Ville Marie, Suite 3431",
+          "ADDR_CITY": "Montreal",
+          "ADDR_COUNTRY": "Canada"
+        },
+        {
+          "ADDR_LINE1": "Parizska 17",
+          "ADDR_CITY": "Prague",
+          "ADDR_COUNTRY": "Czech Republic"
+        },
+        {
+          "ADDR_LINE1": "Paseo de la Republica 126",
+          "ADDR_CITY": "Lima",
+          "ADDR_COUNTRY": "Peru"
+        },
+        {
+          "ADDR_LINE1": "Piarco Airport",
+          "ADDR_CITY": "Port au Prince",
+          "ADDR_COUNTRY": "Haiti"
+        },
+        {
+          "ADDR_LINE1": "c/o Anglo-Caribbean Shipping Co. Ltd.",
+          "ADDR_LINE2": "Ibex House, The Minories",
+          "ADDR_CITY": "London",
+          "ADDR_POSTAL_CODE": "EC3N 1DY",
+          "ADDR_COUNTRY": "United Kingdom"
+        },
+        {
+          "ADDR_LINE1": "Norman Manley International Airport",
+          "ADDR_CITY": "Kingston",
+          "ADDR_COUNTRY": "Jamaica"
+        },
+        {
+          "ADDR_LINE1": "Melchor Ocampo 469, 5DF",
+          "ADDR_CITY": "Mexico City",
+          "ADDR_COUNTRY": "Mexico"
+        },
+        {
+          "ADDR_LINE1": "Calle 29 y Avda Justo Arosemena",
+          "ADDR_CITY": "Panama City",
+          "ADDR_COUNTRY": "Panama"
+        },
+        {
+          "ADDR_LINE1": "Grantley Adams Airport, Christ Church",
+          "ADDR_COUNTRY": "Barbados"
+        },
+        {
+          "ADDR_CITY": "Madrid",
+          "ADDR_COUNTRY": "Spain"
+        }
+      ]
+    }
+  },
+  "opendata-lasvegas.jsonl": {
+    "synopsis": "Dataset featuring company names and addresses with their corporate hierarchies (locations). Also included are people associated with these companies (officers, directors, execs). This is the full Las Vegas dataset.",
+    "primary_source": {
+      "name": "opendata.org",
+      "url": "https://opendata.org"
+    },
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OPENDATA",
+    "sample_record": {
+      "DATA_SOURCE": "OPENDATA",
+      "RECORD_ID": "100067215322",
+      "bq_dataset": "COMPANY",
+      "FEATURES": [
+        {
+          "NAME_ORG": "Z-CRETE CONCRETE CREATIONS, LLC",
+          "NAME_TYPE": "PRIMARY"
+        },
+        {
+          "RECORD_TYPE": "ORGANIZATION"
+        },
+        {
+          "ADDR_CITY": "Las Vegas",
+          "ADDR_COUNTRY": "USA",
+          "ADDR_LINE1": "PO Box 27740",
+          "ADDR_POSTAL_CODE": "89126",
+          "ADDR_STATE": "NV",
+          "ADDR_TYPE": "BUSINESS"
+        },
+        {
+          "GEO_LATITUDE": "36.151130000000002",
+          "GEO_LONGITUDE": "-115.20805"
+        },
+        {
+          "REL_ANCHOR_DOMAIN": "BQ",
+          "REL_ANCHOR_KEY": 100067215322
+        },
+        {
+          "BQ_ID": "100067215322"
+        },
+        {
+          "PLACEKEY": "1melzuufpc@5yv-j8b-s3q"
+        }
+      ]
+    }
+  },
+  "opendata2-lasvegas.jsonl": {
+    "synopsis": null,
+    "primary_source": null,
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OPENDATA",
+    "sample_record": {
+      "DATA_SOURCE": "OPENDATA",
+      "RECORD_ID": "100067215322",
+      "bq_dataset": "COMPANY",
+      "FEATURES": [
+        {
+          "NAME_ORG": "Z-CRETE CONCRETE CREATIONS, LLC",
+          "NAME_TYPE": "PRIMARY"
+        },
+        {
+          "RECORD_TYPE": "ORGANIZATION"
+        },
+        {
+          "ADDR_CITY": "Las Vegas",
+          "ADDR_COUNTRY": "USA",
+          "ADDR_LINE1": "PO Box 27740",
+          "ADDR_POSTAL_CODE": "89126",
+          "ADDR_STATE": "NV",
+          "ADDR_TYPE": "BUSINESS"
+        },
+        {
+          "GEO_LATITUDE": "36.151130000000002",
+          "GEO_LONGITUDE": "-115.20805"
+        },
+        {
+          "REL_ANCHOR_DOMAIN": "BQ",
+          "REL_ANCHOR_KEY": 100067215322
+        },
+        {
+          "BQ_ID": "100067215322"
+        },
+        {
+          "PLACEKEY": "1melzuufpc@5yv-j8b-s3q"
+        }
+      ]
+    }
+  },
+  "opendata3-lasvegas.jsonl": {
+    "synopsis": null,
+    "primary_source": null,
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OPENDATA",
+    "sample_record": {
+      "DATA_SOURCE": "OPENDATA",
+      "RECORD_ID": "100067215322",
+      "bq_dataset": "COMPANY",
+      "FEATURES": [
+        {
+          "NAME_ORG": "Z-CRETE CONCRETE CREATIONS, LLC",
+          "NAME_TYPE": "PRIMARY"
+        },
+        {
+          "RECORD_TYPE": "ORGANIZATION"
+        },
+        {
+          "ADDR_CITY": "Las Vegas",
+          "ADDR_COUNTRY": "USA",
+          "ADDR_LINE1": "PO Box 27740",
+          "ADDR_POSTAL_CODE": "89126",
+          "ADDR_STATE": "NV",
+          "ADDR_TYPE": "BUSINESS"
+        },
+        {
+          "GEO_LATITUDE": "36.151130000000002",
+          "GEO_LONGITUDE": "-115.20805"
+        },
+        {
+          "REL_ANCHOR_DOMAIN": "BQ",
+          "REL_ANCHOR_KEY": 100067215322
+        },
+        {
+          "BQ_ID": "100067215322"
+        },
+        {
+          "PLACEKEY": "1melzuufpc@5yv-j8b-s3q"
+        }
+      ]
+    }
+  },
+  "opendata4-lasvegas.jsonl": {
+    "synopsis": null,
+    "primary_source": null,
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "OPENDATA",
+    "sample_record": {
+      "DATA_SOURCE": "OPENDATA",
+      "RECORD_ID": "100067215322",
+      "bq_dataset": "COMPANY",
+      "FEATURES": [
+        {
+          "NAME_ORG": "Z-CRETE CONCRETE CREATIONS, LLC",
+          "NAME_TYPE": "PRIMARY"
+        },
+        {
+          "RECORD_TYPE": "ORGANIZATION"
+        },
+        {
+          "ADDR_CITY": "Las Vegas",
+          "ADDR_COUNTRY": "USA",
+          "ADDR_LINE1": "PO Box 27740",
+          "ADDR_POSTAL_CODE": "89126",
+          "ADDR_STATE": "NV",
+          "ADDR_TYPE": "BUSINESS"
+        },
+        {
+          "GEO_LATITUDE": "36.151130000000002",
+          "GEO_LONGITUDE": "-115.20805"
+        },
+        {
+          "REL_ANCHOR_DOMAIN": "BQ",
+          "REL_ANCHOR_KEY": 100067215322
+        },
+        {
+          "BQ_ID": "100067215322"
+        },
+        {
+          "PLACEKEY": "1melzuufpc@5yv-j8b-s3q"
+        }
+      ]
+    }
+  },
+  "profound-lasvegas.jsonl": {
+    "synopsis": "DBI dataset delivers verified digital-footprint intelligence across domains, DNS, cloud, security, and technographics to help you evaluate and segment high-potential business accounts. Integrated with Senzing entity resolution, it validates domains, links digital + offline identifiers, and supports risk profiling, segmentation, and Customer 360 initiatives.",
+    "primary_source": null,
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "PROFOUND",
+    "sample_record": {
+      "DATA_SOURCE": "PROFOUND",
+      "RECORD_ID": "vegasphotobooth.com",
+      "RECORD_TYPE": "ORGANIZATION",
+      "REL_ANCHOR_DOMAIN": "DOMAIN",
+      "REL_ANCHOR_KEY": "vegasphotobooth.com",
+      "PRIMARY_NAME_ORG": "Las Vegas Photo Booth",
+      "BUSINESS_ADDR_LINE1": "3315 E Russell rd. A-4 #153",
+      "BUSINESS_ADDR_CITY": "Las Vegas",
+      "BUSINESS_ADDR_STATE": "NV",
+      "BUSINESS_ADDR_POSTAL_CODE": "89120",
+      "BUSINESS_ADDR_COUNTRY": "US",
+      "PRIMARY_PHONE_NUMBER": "702-417-1036",
+      "WEBSITE_ADDRESS": "https://vegasphotobooth.com/",
+      "FACEBOOK": "VegasPhotoBooth",
+      "domain_classification": "business",
+      "web_server_type": "nginx",
+      "cms_type": "WordPress;Wordpress Plugins",
+      "cloud_provider": "GOOGLE INC.",
+      "mail_server_provider": "Microsoft",
+      "whois_created_date": "20070426",
+      "website_risk_propensity": "0.0145026265857016",
+      "organization_type": "S",
+      "RELATIONSHIPS": []
+    }
+  },
+  "us_labor_violations-lasvegas.jsonl": {
+    "synopsis": "Records of concluded compliance actions since 2005, detailing violations, back wages owed, and penalties assessed.",
+    "primary_source": {
+      "name": "US Dept of Labor Compliance",
+      "url": "https://enforcedata.dol.gov/views/data_catalogs.php"
+    },
+    "license": null,
+    "snapshot_date": null,
+    "data_source": "US-LABOR-VIOLATIONS",
+    "sample_record": {
+      "RECORD_TYPE": "ORGANIZATION",
+      "DATA_SOURCE": "US-LABOR-VIOLATIONS",
+      "RECORD_ID": "53",
+      "case_id": "1658108",
+      "PRIMARY_NAME_ORG": "Fabulous Freddy's (Trailwood)",
+      "LEGAL_NAME_ORG": "Fabulous LLC",
+      "BUSINESS_ADDR_LINE1": "9611 Trail Wood Drive",
+      "BUSINESS_ADDR_CITY": "Las Vegas",
+      "BUSINESS_ADDR_STATE": "NV",
+      "BUSINESS_ADDR_POSTAL_CODE": "89134",
+      "naic_cd": "811192",
+      "naics_code_description": "Car Washes",
+      "ee_violtd_cnt": "1",
+      "findings_start_date": "2009-06-06",
+      "findings_end_date": "2012-06-05",
+      "ld_dt": "2015-04-01 01:00:03 EDT"
+    }
+  }
+}

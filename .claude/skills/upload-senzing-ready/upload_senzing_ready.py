@@ -29,7 +29,7 @@ STAGING = "unreleased"
 STAGING_NOTES = "Files uploaded by /upload-senzing-ready, waiting for the next release."
 MAX_SIZE = 2 * 1024**3  # GitHub Release asset limit
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*\.jsonl$")
-# docs/cords.md heading for each region, the part of a file name after the last hyphen.
+# Catalog (docs/cords.html) heading for each region, the part of a file name after the last hyphen.
 # /publish-cord groups the catalog by these; regions may share a heading.
 REGIONS = {
     "lasvegas": "Las Vegas",
