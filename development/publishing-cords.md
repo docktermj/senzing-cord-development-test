@@ -18,3 +18,26 @@ You need write access to this repository. Without it, see
 
 [CORD publishing approach](publishing-approach.md#current-workflow) explains each step
 and why the files are published this way.
+
+## Add a `cords.json` entry
+
+Every released file needs an entry in [`cords.json`](cords.json), keyed by file name.
+`/publish-cord` stops before releasing a file without one. Add it before running
+`/publish-cord`:
+
+```json
+"gleif-london.jsonl": {
+  "synopsis": "One or two sentences on what the data is.",
+  "primary_source": {"name": "GLEIF (Global LEI)", "url": "https://www.gleif.org/"},
+  "license": null,
+  "snapshot_date": null,
+  "data_source": "GLEIF",
+  "sample_record": {"DATA_SOURCE": "GLEIF", "RECORD_ID": "...", "...": "..."}
+}
+```
+
+- `synopsis`, `primary_source` (`name` and `url`), `license` and `snapshot_date`
+  (`YYYY-MM-DD`): from the primary source, or `null` where it doesn't say. The catalog
+  shows `null` as "Not stated".
+- `data_source`: the records' `DATA_SOURCE` code.
+- `sample_record`: one record from the file, as JSON; the first line works.
