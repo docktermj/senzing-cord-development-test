@@ -1,6 +1,6 @@
 ---
 name: publish-cord
-description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, docs/cords.md and CORD_stats.xlsx updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
+description: Publish a SemVer release of the CORD JSONL files — a GitHub Release holding the new and changed files in manifest.json, and the manifest.json, CHANGELOG.md, docs/cords.md and development/CORD_stats.xlsx/.csv updates merged into main. Use when the user runs /publish-cord; it runs the /upload-senzing-ready upload itself first. Asks for the SemVer bump and before merging.
 disable-model-invocation: true
 ---
 
@@ -71,9 +71,11 @@ answer: the SemVer bump, and whether to merge.
      changed files (`tag: null` in `manifest.json`) move with it without being uploaded again;
    - deletes any asset of that draft that isn't a new or changed file, and stops if a new or
      changed file is missing or its `digest` doesn't match `manifest.json`;
-   - runs `bin/get_cord_stats.py` on those same files to update `CORD_stats.xlsx`, taking each
+   - runs `bin/get_cord_stats.py` on those same files to update `development/CORD_stats.xlsx`
+     and `development/CORD_stats.csv`, taking each
      from `senzing-ready/` when its SHA-256 matches and from the draft otherwise;
-   - commits `manifest.json`, `CHANGELOG.md`, `docs/cords.md` and `CORD_stats.xlsx` on the
+   - commits `manifest.json`, `CHANGELOG.md`, `docs/cords.md`, `development/CORD_stats.xlsx` and
+     `development/CORD_stats.csv` on the
      branch `release-<version>`;
    - pushes the branch and opens the PR.
 
@@ -119,11 +121,15 @@ answer: the SemVer bump, and whether to merge.
   `python3 .claude/skills/publish-cord/publish_cord.py catalog` to rewrite it; it needs no
   network or `gh`, and leaves a current file unchanged.
 - **`README.md`:** not changed; its `## CORDs` section links to the catalog.
-- **`CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
+- **`development/CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
   file, matched on `SOURCE` and `GEO`. It sets the counts (a feature no longer present becomes
   0), `LAST_UPDATED` (the release date) and `UPDATE_REASON` (`Added in <version>` or
   `Changed in <version>`, following `[Unreleased]`). A new file gets a new row. No other cell
   changes.
+- **`development/CORD_stats.csv`:** rewritten from the workbook by the same run: the same rows
+  and columns, dates as `YYYY-MM-DD`. A test fails while it is out of date; after a hand edit
+  to the workbook, rewrite it with
+  `python3 bin/get_cord_stats.py --stats development/CORD_stats.xlsx`.
 - **`CHANGELOG.md`:** `## [Unreleased]` becomes `## [<version>] - YYYY-MM-DD` under a new
   empty `## [Unreleased]`. The link definitions get `[Unreleased]` comparing
   `<version>...HEAD`, and `[<version>]` comparing the previous tag with `<version>`. The file

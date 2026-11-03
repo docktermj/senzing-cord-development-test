@@ -19,7 +19,9 @@ try:
 except ImportError:
     openpyxl = None
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO_STATS = os.path.join(HERE, "..", "development", "CORD_stats.xlsx")
+sys.path.insert(0, HERE)
 if openpyxl:
     import get_cord_stats  # noqa: E402
 
@@ -98,6 +100,79 @@ class GetCordStatsTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("bob.jsonl: expected <source>-<geo>.jsonl", output)
         self.assertEqual(os.path.getmtime(self.stats), before)
+        self.assertFalse(os.path.exists(self.csv()))
+
+    # --- CSV ---
+
+    def csv(self):
+        return os.path.join(self.tmp, "CORD_stats.csv")
+
+    def read_csv(self):
+        with open(self.csv(), "rb") as file:
+            return file.read().decode("utf-8")
+
+    def test_update_also_writes_the_csv(self):
+        path = self.write_jsonl("ofac-london.jsonl", RECORDS)
+        code, output = self.run_stats("--reason", "Changed in 0.2.0", path)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(self.read_csv(), (
+            ",".join(HEADER) + "\n"
+            "2026-10-29,Changed in 0.2.0,ofac,london,2,2,2,0\n"
+            "2025-01-02,keep me,gleif,london,5,0,5,0\n"
+            "2025-01-02,other,ofac,moscow,9,9,9,9\n"
+        ))
+
+    def test_no_files_rewrites_only_the_csv(self):
+        before = os.path.getmtime(self.stats)
+        code, output = self.run_stats()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(os.path.getmtime(self.stats), before)
+        self.assertIn("updated: ", output)
+        self.assertTrue(self.read_csv().startswith(",".join(HEADER) + "\n2025-01-02,manual note,"))
+
+    def test_files_without_reason_stop(self):
+        path = self.write_jsonl("ofac-london.jsonl", RECORDS)
+        with self.assertRaises(SystemExit) as stop, \
+                contextlib.redirect_stderr(io.StringIO()):
+            get_cord_stats.main(["--stats", self.stats, path])
+        self.assertEqual(stop.exception.code, 2)
+
+    def test_csv_format(self):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["LAST_UPDATED", "UPDATE_REASON", "SOURCE", "RECORD_COUNT", "NAME_FEATURES"])
+        ws.append([datetime.datetime(2025, 7, 4, 10, 36, 39, 537000), None, "a,b", 1, None])
+        ws.append([datetime.datetime(2026, 1, 2), 'say "hi"', "caf\u00e9", 0, 12])
+        get_cord_stats.export_csv(ws, self.csv())
+        with open(self.csv(), "rb") as file:
+            raw = file.read()
+        self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
+        self.assertNotIn(b"\r", raw)
+        self.assertEqual(raw.decode("utf-8"), (
+            "LAST_UPDATED,UPDATE_REASON,SOURCE,RECORD_COUNT,NAME_FEATURES\n"
+            '2025-07-04,,"a,b",1,\n'
+            '2026-01-02,"say ""hi""",caf\u00e9,0,12\n'
+        ))
+
+    def test_csv_path_is_next_to_the_workbook(self):
+        self.assertEqual(get_cord_stats.csv_path(os.path.join("development", "CORD_stats.xlsx")),
+                         os.path.join("development", "CORD_stats.csv"))
+
+
+@unittest.skipUnless(openpyxl, "openpyxl is not installed: pip install openpyxl")
+class RepoStatsTest(unittest.TestCase):
+    def test_committed_csv_matches_the_workbook(self):
+        expected = os.path.join(tempfile.mkdtemp(), "CORD_stats.csv")
+        self.addCleanup(shutil.rmtree, os.path.dirname(expected))
+        get_cord_stats.export_csv(openpyxl.load_workbook(REPO_STATS).worksheets[0], expected)
+        with open(expected, "rb") as file:
+            want = file.read()
+        with open(get_cord_stats.csv_path(REPO_STATS), "rb") as file:
+            got = file.read()
+        self.assertEqual(got, want,
+                         "development/CORD_stats.csv is out of date with CORD_stats.xlsx; "
+                         "rewrite it with: python3 bin/get_cord_stats.py "
+                         "--stats development/CORD_stats.xlsx")
 
 
 if __name__ == "__main__":

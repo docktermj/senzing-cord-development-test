@@ -8,7 +8,8 @@ The data files are not stored in git. Each version is a
 the files that are new or changed in that version, and [`manifest.json`](manifest.json) lists
 each file's size, SHA-256 and download URL: the Release where it last changed.
 [`CHANGELOG.md`](CHANGELOG.md) says what changed in each version, and
-[`CORD_stats.xlsx`](CORD_stats.xlsx) holds record and feature counts for each file.
+[`development/CORD_stats.xlsx`](development/CORD_stats.xlsx) holds record and feature counts for
+each file, also written as [`development/CORD_stats.csv`](development/CORD_stats.csv).
 
 ## CORDs
 

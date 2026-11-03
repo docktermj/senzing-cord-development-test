@@ -35,7 +35,7 @@ A writer to this repository, in Claude Code:
 4. **`/publish-cord`** runs that upload itself, asks for the SemVer bump, renames the draft to
    the new version, and opens a `release-<version>` pull request that updates `manifest.json`,
    `CHANGELOG.md`, the catalog `docs/cords.md` (which README links to) and
-   `CORD_stats.xlsx`. After the user approves the merge, it publishes the Release on the merge
+   `development/CORD_stats.xlsx` with its CSV copy `development/CORD_stats.csv`. After the user approves the merge, it publishes the Release on the merge
    commit.
 5. **`check-releases.yml`** runs `download_senzing_ready.py --verify` weekly. It fails if a
    released file's asset `digest`, or its senzing.com copy, no longer matches the manifest's

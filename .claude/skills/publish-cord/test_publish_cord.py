@@ -138,13 +138,17 @@ FAKE_CURL = textwrap.dedent(
     """
 )
 
-# Stands in for bin/get_cord_stats.py: appends its arguments to the --stats file.
+# Stands in for bin/get_cord_stats.py: appends its arguments to the --stats file, and
+# writes the workbook's line count to the CSV next to it.
 FAKE_STATS = textwrap.dedent(
     """\
     import os, sys
     args = sys.argv[1:]
-    with open(args[args.index("--stats") + 1], "a") as stats:
+    path = args[args.index("--stats") + 1]
+    with open(path, "a") as stats:
         stats.write(" ".join(os.path.basename(a) for a in args) + "\\n")
+    with open(path) as stats, open(os.path.splitext(path)[0] + ".csv", "w") as csv:
+        csv.write(f"lines,{len(stats.readlines())}\\n")
     """
 )
 
@@ -208,7 +212,8 @@ class ReleaseTest(unittest.TestCase):
                        capture_output=True)
         self.write(".gitignore", "/senzing-ready\n")
         self.write("README.md", README)
-        self.write("CORD_stats.xlsx", "stats\n")
+        self.write("development/CORD_stats.xlsx", "stats\n")
+        self.write("development/CORD_stats.csv", "lines,1\n")
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
         self.git("add", ".")
         self.git("commit", "-q", "-m", "initial")
@@ -227,7 +232,9 @@ class ReleaseTest(unittest.TestCase):
                               capture_output=True, text=True).stdout.strip()
 
     def write(self, name, text):
-        with open(os.path.join(self.root, name), "w") as file:
+        path = os.path.join(self.root, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as file:
             file.write(text)
 
     def entry(self, name, data, tag):
@@ -564,8 +571,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("[0.2.0]: https://github.com/Owner/Repo/compare/v0.1.0...0.2.0", changelog)
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
         create = next(c for c in self.calls() if c[:2] == ["pr", "create"])
-        self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `docs/cords.md` and "
-                      "`CORD_stats.xlsx`.",
+        self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `docs/cords.md`, "
+                      "`development/CORD_stats.xlsx` and `development/CORD_stats.csv`.",
                       create[create.index("--body") + 1])
 
     def test_prepare_requires_bump(self):
@@ -632,7 +639,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(self.origin_file("release-0.2.0", "README.md"), README)
         changed = self.git("diff", "--name-only", "main", "release-0.2.0").split()
         self.assertEqual(sorted(changed),
-                         ["CHANGELOG.md", "CORD_stats.xlsx", "docs/cords.md", "manifest.json"])
+                         ["CHANGELOG.md", "development/CORD_stats.csv",
+                          "development/CORD_stats.xlsx", "docs/cords.md", "manifest.json"])
 
     def test_prepare_writes_the_catalog(self):
         code, output = self.release("prepare", "--bump", "minor")
@@ -655,7 +663,9 @@ class ReleaseTest(unittest.TestCase):
                    + "\n### Changed\n\n- `a-london.jsonl`\n")
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 0, output)
-        self.assertEqual(self.origin_file("release-0.2.0", "CORD_stats.xlsx"), (
+        self.assertEqual(self.origin_file("release-0.2.0", "development/CORD_stats.csv"),
+                         "lines,3\n")
+        self.assertEqual(self.origin_file("release-0.2.0", "development/CORD_stats.xlsx"), (
             "stats\n"
             f"--stats CORD_stats.xlsx --reason Added in 0.2.0 --date {TODAY} b-london.jsonl\n"
             f"--stats CORD_stats.xlsx --reason Changed in 0.2.0 --date {TODAY} a-london.jsonl\n"

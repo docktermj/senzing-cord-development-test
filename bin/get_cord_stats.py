@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update CORD_stats.xlsx with the statistics of the given Senzing-ready JSONL files.
+"""Update development/CORD_stats.xlsx with the statistics of the given Senzing-ready JSONL files.
 
 Only the row of each given file changes, matched on SOURCE and GEO, which come
 from the file name <source>-<geo>.jsonl split on the last hyphen. Its counts are
@@ -7,10 +7,16 @@ rewritten (a feature no longer present becomes 0), LAST_UPDATED is set to
 --date, and UPDATE_REASON to --reason. A file with no row gets a new one,
 formatted like the last row. Every other row and cell is left as it is.
 
-usage: get_cord_stats.py --stats CORD_stats.xlsx --reason TEXT [--date YYYY-MM-DD] FILE...
+The workbook is the source of truth. After every save its first sheet is also
+written as CSV next to it (the same path with a .csv extension): the same rows
+and columns, dates as YYYY-MM-DD, blank cells as empty fields, UTF-8, \n line
+endings. With no FILE, only that CSV is rewritten and the workbook is unchanged.
+
+usage: get_cord_stats.py --stats development/CORD_stats.xlsx [--reason TEXT] [--date YYYY-MM-DD] [FILE...]
 """
 
 import argparse
+import csv
 import datetime
 import os
 import sys
@@ -105,13 +111,37 @@ def update_row(ws, column_header, column_values, reason, date):
     ws.cell(row=row_idx, column=column_header.index("UPDATE_REASON") + 1).value = reason
 
 
+def csv_path(stats):
+    """The CSV written next to the workbook: the same path with a .csv extension."""
+    return os.path.splitext(stats)[0] + ".csv"
+
+
+def csv_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.strftime("%Y-%m-%d")
+    return value
+
+
+def export_csv(ws, path):
+    """Write the sheet's rows to path as CSV; see the module docstring for the format."""
+    with open(path, "w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file, lineterminator="\n")
+        for row in ws.values:
+            writer.writerow(csv_value(value) for value in row)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--stats", required=True, help="the workbook to update")
-    parser.add_argument("--reason", required=True, help="UPDATE_REASON for every file given")
+    parser.add_argument("--reason", help="UPDATE_REASON for every file given (required with FILE)")
     parser.add_argument("--date", help="LAST_UPDATED as YYYY-MM-DD (default: today)")
-    parser.add_argument("files", nargs="+", metavar="FILE")
+    parser.add_argument("files", nargs="*", metavar="FILE",
+                        help="the JSONL files to count; none only rewrites the CSV")
     args = parser.parse_args(argv)
+    if args.files and not args.reason:
+        parser.error("--reason is required with FILE")
 
     date = datetime.datetime.strptime(args.date, "%Y-%m-%d") if args.date else (
         datetime.datetime.combine(datetime.date.today(), datetime.time()))
@@ -125,14 +155,21 @@ def main(argv=None):
         print(f"stopped: {args.stats} not found", file=sys.stderr)
         return 2
 
-    json_parser = json2attribute(CONFIG)
     wb = load_workbook(args.stats)
     ws = wb.worksheets[0]
+    if not args.files:
+        export_csv(ws, csv_path(args.stats))
+        print(f"updated: {csv_path(args.stats)}")
+        return 0
+
+    json_parser = json2attribute(CONFIG)
     column_header = list(next(ws.values))
     for path in args.files:
         update_row(ws, column_header, file_stats(json_parser, path), args.reason, date)
         print(f"updated: {os.path.basename(path)}")
     wb.save(args.stats)
+    export_csv(ws, csv_path(args.stats))
+    print(f"updated: {csv_path(args.stats)}")
     return 0
 
 

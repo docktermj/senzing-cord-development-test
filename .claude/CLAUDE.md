@@ -49,8 +49,9 @@ nothing. `/publish-cord` (`.claude/skills/publish-cord/`) publishes them:
   on any refused file; it skips this while resuming a draft;
 - it asks for the SemVer bump;
 - it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
-  also rewrites the catalog `docs/cords.md` and the files' rows in `CORD_stats.xlsx`
-  (through `bin/get_cord_stats.py`); it never changes `README.md`, whose `## CORDs` section
+  also rewrites the catalog `docs/cords.md` and the files' rows in
+  `development/CORD_stats.xlsx` (through `bin/get_cord_stats.py`, which also rewrites
+  `development/CORD_stats.csv` from it); it never changes `README.md`, whose `## CORDs` section
   links to the catalog;
 - it asks before merging;
 - it then publishes the draft on the merge commit.
