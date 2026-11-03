@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-03
+
+### Added
+
+- `ofac-moscow.jsonl` (1,643,552 bytes, SHA-256 `b238fb9f25b1474b5f4ea2d2181c8ed0e4bfd65e2db4eafd5bec7f4d9dddb39f`)
+
 ## [0.1.8] - 2026-10-30
 
 ### Added
@@ -55,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ofac-london.jsonl` (102,967 bytes, SHA-256 `2299bcaf6b9111fed771b3c54a56685f5239f75c57c47d322020f742c21eb40b`)
 
-[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.8...HEAD
+[Unreleased]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.9...HEAD
+[0.1.9]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.8...0.1.9
 [0.1.8]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.7...0.1.8
 [0.1.7]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.6...0.1.7
 [0.1.6]: https://github.com/docktermj/senzing-cord-development-test/compare/0.1.5...0.1.6
