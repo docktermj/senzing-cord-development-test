@@ -22,4 +22,6 @@
 
 ## Moscow
 
-Not published yet.
+| File | Version | Size (bytes) | SHA-256 |
+| --- | --- | ---: | --- |
+| [ofac-moscow.jsonl](https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.9/ofac-moscow.jsonl) | 0.1.9 | 1,643,552 | `b238fb9f25b1474b5f4ea2d2181c8ed0e4bfd65e2db4eafd5bec7f4d9dddb39f` |

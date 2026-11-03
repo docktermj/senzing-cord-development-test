@@ -17,6 +17,14 @@
       "source": "https://senzing.com/datasets/ofac-london.jsonl"
     },
     {
+      "name": "ofac-moscow.jsonl",
+      "size": 1643552,
+      "sha256": "b238fb9f25b1474b5f4ea2d2181c8ed0e4bfd65e2db4eafd5bec7f4d9dddb39f",
+      "tag": "0.1.9",
+      "url": "https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.9/ofac-moscow.jsonl",
+      "source": "https://senzing.com/datasets/ofac-moscow.jsonl"
+    },
+    {
       "name": "opendata-lasvegas.jsonl",
       "size": 980688237,
       "sha256": "eed5ff8d46bea3ad24bf369541f35339968e646ea3b8af2ce3c02146ffae56b7",
