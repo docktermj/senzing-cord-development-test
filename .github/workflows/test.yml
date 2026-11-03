@@ -53,4 +53,4 @@ jobs:
 
       # Globs are quoted so markdownlint expands them, including ** into .claude/skills/*/.
       - name: markdownlint
-        run: markdownlint README.md CHANGELOG.md 'docs/*.md' '.claude/*.md' '.claude/**/*.md'
+        run: markdownlint README.md CHANGELOG.md 'docs/*.md' 'development/*.md' '.claude/*.md' '.claude/**/*.md'

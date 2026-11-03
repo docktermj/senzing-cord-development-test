@@ -7,14 +7,13 @@ body:
       value: |
         Host the file at a public download link, then fill in the fields below. A writer
         downloads it, checks its size and SHA-256 against this issue, and publishes it.
-        The README's
-        [Submit a CORD without write access](https://github.com/docktermj/senzing-cord-development-test#submit-a-cord-without-write-access)
+        [Submit a CORD without write access](https://github.com/docktermj/senzing-cord-development-test/blob/main/development/submit-without-write-access.md)
         has the steps.
   - type: input
     id: file-name
     attributes:
       label: File name
-      description: "`<source>-<region>.jsonl`, in lowercase, with a region already listed under CORDs in the README."
+      description: "`<source>-<region>.jsonl`, in lowercase, with a region already listed in the [CORD catalog](https://github.com/docktermj/senzing-cord-development-test/blob/main/docs/cords.md)."
       placeholder: gleif-london.jsonl
     validations:
       required: true
