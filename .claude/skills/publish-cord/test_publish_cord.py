@@ -139,18 +139,51 @@ FAKE_CURL = textwrap.dedent(
 )
 
 # Stands in for bin/get_cord_stats.py: appends its arguments to the --stats file, and
-# writes the workbook's line count to the CSV next to it.
+# rewrites the CSV next to it as the real script does: the header, then one row per file,
+# with each given file's row replaced (or added) and its line count as every count.
 FAKE_STATS = textwrap.dedent(
     """\
-    import os, sys
+    import csv, os, sys
     args = sys.argv[1:]
     path = args[args.index("--stats") + 1]
     with open(path, "a") as stats:
         stats.write(" ".join(os.path.basename(a) for a in args) + "\\n")
-    with open(path) as stats, open(os.path.splitext(path)[0] + ".csv", "w") as csv:
-        csv.write(f"lines,{len(stats.readlines())}\\n")
+    csv_path = os.path.splitext(path)[0] + ".csv"
+    with open(csv_path, newline="") as file:
+        rows = list(csv.reader(file))
+    for arg in (a for a in args if a.endswith(".jsonl")):
+        source, geo = os.path.basename(arg)[: -len(".jsonl")].rsplit("-", 1)
+        count = str(len(open(arg).readlines()))
+        row = [args[args.index("--date") + 1], args[args.index("--reason") + 1], source, geo,
+               count, "0", count, count, "", "0"]
+        keys = [r[2:4] for r in rows]
+        if [source, geo] in keys:
+            rows[keys.index([source, geo])] = row
+        else:
+            rows.append(row)
+    with open(csv_path, "w", newline="") as file:
+        csv.writer(file, lineterminator="\\n").writerows(rows)
     """
 )
+
+STATS_CSV = (
+    "LAST_UPDATED,UPDATE_REASON,SOURCE,GEO,RECORD_COUNT,ORGANIZATION_COUNT,PERSON_COUNT,"
+    "NAME_FEATURES,ADDRESS_FEATURES,PHONE_FEATURES\n"
+    "2026-10-27,Added in 0.1.0,a,london,1,0,1,1,,0\n"
+)
+
+CHANGELOG_0_1_0 = "\n## [0.1.0] - 2026-10-27\n\n### Added\n\n- `a-london.jsonl`\n"
+
+
+def cord(name, **fields):
+    """A development/cords.json entry, with every field set unless given."""
+    return {
+        "synopsis": f"Synopsis of {name}.", "primary_source": {"name": "Source",
+                                                               "url": "https://example.com"},
+        "license": "CC0", "snapshot_date": "2026-01-01", "data_source": "SRC",
+        "sample_record": {"DATA_SOURCE": "SRC", "RECORD_ID": "1"}, **fields,
+    }
+
 
 README = "# repo\n\nNo CORDs section, which publish_cord.py never reads.\n"
 
@@ -213,7 +246,8 @@ class ReleaseTest(unittest.TestCase):
         self.write(".gitignore", "/senzing-ready\n")
         self.write("README.md", README)
         self.write("development/CORD_stats.xlsx", "stats\n")
-        self.write("development/CORD_stats.csv", "lines,1\n")
+        self.write("development/CORD_stats.csv", STATS_CSV)
+        self.write_cords({"a-london.jsonl": cord("a-london.jsonl")})
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0")])
         self.git("add", ".")
         self.git("commit", "-q", "-m", "initial")
@@ -246,12 +280,21 @@ class ReleaseTest(unittest.TestCase):
     def write_manifest(self, entries):
         self.write("manifest.json", json.dumps({"files": entries}, indent=2) + "\n")
 
+    def write_cords(self, cords):
+        self.write(publish_cord.CORDS_FILE, json.dumps(cords, indent=2) + "\n")
+
+    def cords(self):
+        return json.loads(read(os.path.join(self.root, publish_cord.CORDS_FILE)))
+
     def upload_b(self):
-        """The working-tree state /upload-senzing-ready leaves after adding b-london.jsonl."""
+        """The working-tree state /upload-senzing-ready leaves after adding b-london.jsonl,
+        with the cords.json entry the maintainer adds for it, not committed yet."""
         self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
                              self.entry("b-london.jsonl", FILE_B, None)])
         self.write("CHANGELOG.md", publish_cord.upload.CHANGELOG_HEADER
-                   + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n")
+                   + "\n## [Unreleased]\n\n### Added\n\n- `b-london.jsonl`\n"
+                   + CHANGELOG_0_1_0)
+        self.write_cords({**self.cords(), "b-london.jsonl": cord("b-london.jsonl")})
 
     def stage(self, name, data):
         """Put a file on the staging draft, as /upload-senzing-ready leaves it."""
@@ -316,69 +359,24 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(publish_cord.suggest_bump({"Added": ["y"], "Changed": ["z"]}), "minor")
         self.assertEqual(publish_cord.suggest_bump({"Changed": ["z"]}), "patch")
 
-    def test_catalog_lists_released_files_by_heading(self):
-        base = "https://example.com"
-        entries = [
-            {"name": "c-london.jsonl", "size": 45162274, "sha256": "c" * 64, "tag": "0.2.0",
-             "url": f"{base}/c"},
-            {"name": "a-london_central_a.jsonl", "size": 7, "sha256": "a" * 64, "tag": "v0.1.0",
-             "url": f"{base}/a"},
-            {"name": "b-london.jsonl", "size": 1234, "sha256": "b" * 64, "tag": None,
-             "url": None},
-            {"name": "d-moscow.jsonl", "size": 99, "sha256": "d" * 64, "tag": None, "url": None},
-        ]
-        result = publish_cord.cords_catalog(entries)
-        self.assertEqual(result, publish_cord.CATALOG_COMMENT + "\n" + textwrap.dedent(f"""
-            # CORD catalog
-
-            ## Las Vegas
-
-            Not published yet.
-
-            ## London
-
-            | File | Version | Size (bytes) | SHA-256 |
-            | --- | --- | ---: | --- |
-            | [a-london_central_a.jsonl]({base}/a) | v0.1.0 | 7 | `{"a" * 64}` |
-            | [c-london.jsonl]({base}/c) | 0.2.0 | 45,162,274 | `{"c" * 64}` |
-
-            ## Moscow
-
-            Not published yet.
-            """))
-        self.assertTrue(publish_cord.CATALOG_COMMENT.startswith("<!-- "))
-        for words in ("/publish-cord", "manifest.json", "do not edit by hand", " catalog -->"):
-            self.assertIn(words, publish_cord.CATALOG_COMMENT)
-
-    def test_catalog_without_files_says_not_published_for_every_heading(self):
-        result = publish_cord.cords_catalog([])
-        self.assertEqual(result.count("Not published yet."), 3)
-        self.assertNotIn("| File |", result)
-        self.assertEqual(
-            [line for line in result.splitlines() if line.startswith("## ")],
-            ["## Las Vegas", "## London", "## Moscow"],
-        )
-        self.assertTrue(result.endswith("## Moscow\n\nNot published yet.\n"))
-
-    def test_catalog_stops_on_unmapped_region_even_when_unreleased(self):
-        entries = [{"name": "c-paris.jsonl", "size": 1, "sha256": "c" * 64, "tag": None,
-                    "url": None}]
-        with self.assertRaises(publish_cord.StopError) as caught:
-            publish_cord.cords_catalog(entries)
-        self.assertEqual(str(caught.exception),
-                         publish_cord.upload.region_error("c-paris.jsonl"))
+    def test_human_size(self):
+        self.assertEqual(publish_cord.human_size(1961376474), "2.0 GB")
+        self.assertEqual(publish_cord.human_size(45162274), "45.2 MB")
+        self.assertEqual(publish_cord.human_size(102967), "103.0 kB")
+        self.assertEqual(publish_cord.human_size(7), "7 bytes")
 
     def test_catalog_for_the_current_manifest_is_unchanged(self):
         root = os.path.dirname(os.path.dirname(os.path.dirname(
             os.path.dirname(os.path.abspath(__file__)))))
-        path = os.path.join(root, publish_cord.CATALOG_FILE)
-        entries = json.loads(read(os.path.join(root, "manifest.json")))["files"]
-        self.assertEqual(
-            read(path) if os.path.exists(path) else None,
-            publish_cord.cords_catalog(entries),
-            "docs/cords.md is out of date with manifest.json; rewrite it with "
-            "python3 .claude/skills/publish-cord/publish_cord.py catalog",
-        )
+        for name, text in publish_cord.catalog_pages(root).items():
+            path = os.path.join(root, name)
+            self.assertEqual(
+                read(path) if os.path.exists(path) else None, text,
+                f"{name} is out of date with {publish_cord.CATALOG_INPUTS}; rewrite it with "
+                f"{publish_cord.CATALOG_COMMAND}",
+            )
+        self.assertEqual(publish_cord.CATALOG_COMMAND,
+                         "python3 .claude/skills/publish-cord/publish_cord.py catalog")
 
     def test_released_changelog(self):
         text = (publish_cord.upload.CHANGELOG_HEADER
@@ -427,6 +425,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn({"name": "c-moscow.jsonl", "tag": None},
                       [{"name": e["name"], "tag": e["tag"]} for e in manifest["files"]])
         self.assertIn("- `c-moscow.jsonl`", read(os.path.join(self.root, "CHANGELOG.md")))
+        self.write_cords({**self.cords(), "c-moscow.jsonl": cord("c-moscow.jsonl")})
         code, output = self.release("status")
         self.assertEqual(code, 0, output)
         self.assertIn("next: prepare", output)
@@ -462,41 +461,138 @@ class ReleaseTest(unittest.TestCase):
 
     # --- catalog ---
 
-    def test_catalog_command_writes_the_file_then_leaves_it_unchanged(self):
-        path = os.path.join(self.root, "docs", "cords.md")
+    def catalog_page(self, name="cords.html"):
+        return read(os.path.join(self.root, "docs", name))
+
+    def test_catalog_command_writes_the_pages_then_leaves_them_unchanged(self):
         code, output = self.release("catalog")
         self.assertEqual(code, 0, output)
-        self.assertEqual(output, "updated: docs/cords.md\n")
-        manifest = json.loads(read(os.path.join(self.root, "manifest.json")))
-        self.assertEqual(read(path), publish_cord.cords_catalog(manifest["files"]))
-        # b-london.jsonl is staged with tag null, so only a-london.jsonl is listed.
-        self.assertIn("| [a-london.jsonl](", read(path))
-        self.assertNotIn("b-london.jsonl", read(path))
-        with open(path, "rb") as file:
-            before = file.read()
-        mtime = os.stat(path).st_mtime_ns
+        self.assertEqual(output, "updated: docs/index.html\nupdated: docs/cords.html\n"
+                                 "updated: docs/cords.md\n")
+        pages = publish_cord.catalog_pages(self.root)
+        for name, text in pages.items():
+            self.assertEqual(read(os.path.join(self.root, name)), text)
+            self.assertTrue(text.startswith(publish_cord.CATALOG_COMMENT + "\n"))
+        self.assertIn(publish_cord.CATALOG_COMMAND, publish_cord.CATALOG_COMMENT)
+        self.assertIn("<https://hub.dockter.com/senzing-cord-development-test/cords.html>",
+                      self.catalog_page("cords.md"))
+        before = {name: os.stat(os.path.join(self.root, name)).st_mtime_ns for name in pages}
         code, output = self.release("catalog")
         self.assertEqual(code, 0, output)
-        self.assertEqual(output, "unchanged: docs/cords.md\n")
-        with open(path, "rb") as file:
-            self.assertEqual(file.read(), before)
-        self.assertEqual(os.stat(path).st_mtime_ns, mtime)
+        self.assertEqual(output, "unchanged: docs/index.html\nunchanged: docs/cords.html\n"
+                                 "unchanged: docs/cords.md\n")
+        self.assertEqual(before, {name: os.stat(os.path.join(self.root, name)).st_mtime_ns
+                                  for name in pages})
         self.assertEqual(self.calls(), [])  # no gh
 
-    def test_catalog_command_rewrites_a_stale_file(self):
-        os.makedirs(os.path.join(self.root, "docs"))
-        self.write(os.path.join("docs", "cords.md"), "stale\n")
+    def test_catalog_shows_a_released_file(self):
+        self.release("catalog")
+        page = self.catalog_page()
+        url = "https://github.com/Owner/Repo/releases/download/v0.1.0/a-london.jsonl"
+        for text in (
+            '<h2>London</h2>', '<article class="cord" id="a-london">',
+            "Synopsis of a-london.jsonl.", '<a href="https://example.com">Source</a>',
+            "CC0", "2026-01-01", f'<a class="button" href="{url}">',
+            f"curl -fsSLO {url}\n",
+            f'echo "{sha(FILE_A)}  a-london.jsonl" | sha256sum -c',
+            f"{len(FILE_A)} bytes ({len(FILE_A)} bytes)",
+            # v0.1.0 counts as 0.1.0, so its date and anchor come from [0.1.0].
+            "0.1.0, released 2026-10-27 (<a href=\"https://github.com/docktermj/"
+            "senzing-cord-development-test/blob/main/CHANGELOG.md#010---2026-10-27\">",
+            "1 (1 persons, 0 organizations)", "<code>SRC</code>",
+            "<details><summary>Sample record</summary><pre><code>{\n"
+            "  &quot;DATA_SOURCE&quot;: &quot;SRC&quot;,",
+            "Related CORDs: None yet.",
+        ):
+            self.assertIn(text, page)
+        self.assertIn(f"curl -fsSLO {url}\n", self.catalog_page("index.html"))
+        self.assertIn('href="https://senzing.com/senzing-ready-data-collections-cord/"',
+                      self.catalog_page("index.html"))
+        self.assertIn('href="cords.html"', self.catalog_page("index.html"))
+
+    def test_catalog_badges_only_non_zero_features(self):
+        self.release("catalog")
+        # NAME_FEATURES is 1, ADDRESS_FEATURES blank and PHONE_FEATURES 0.
+        self.assertIn('<ul class="badges"><li title="1">NAME</li></ul>', self.catalog_page())
+        self.assertNotIn(">ADDRESS<", self.catalog_page())
+        self.assertNotIn(">PHONE<", self.catalog_page())
+
+    def test_catalog_leaves_out_unreleased_files(self):
+        # b-london.jsonl is staged with tag null, and already has a cords.json entry.
+        self.release("catalog")
+        for name in ("index.html", "cords.html"):
+            self.assertNotIn("b-london", self.catalog_page(name))
+
+    def test_catalog_says_not_stated_for_nulls(self):
+        self.write_cords({"a-london.jsonl": cord(
+            "a-london.jsonl", synopsis=None, primary_source=None, license=None,
+            snapshot_date=None)})
         code, output = self.release("catalog")
         self.assertEqual(code, 0, output)
-        self.assertEqual(output, "updated: docs/cords.md\n")
-        self.assertIn("# CORD catalog", read(os.path.join(self.root, "docs", "cords.md")))
+        self.assertEqual(self.catalog_page().count('<span class="none">Not stated</span>'), 4)
 
-    def test_catalog_command_stops_on_unmapped_region(self):
-        self.write_manifest([self.entry("c-paris.jsonl", FILE_B, None)])
+    def test_catalog_links_related_cords_in_the_same_locale(self):
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
+                             self.entry("a-london_central_a.jsonl", FILE_B, "v0.1.0"),
+                             self.entry("a-moscow.jsonl", FILE_C, "v0.1.0")])
+        self.write_cords({name: cord(name) for name in (
+            "a-london.jsonl", "a-london_central_a.jsonl", "a-moscow.jsonl")})
+        self.write("development/CORD_stats.csv", STATS_CSV
+                   + "2026-10-27,,a,london_central_a,2,0,2,2,,0\n"
+                   + "2026-10-27,,a,moscow,1,0,1,1,,0\n")
         code, output = self.release("catalog")
-        self.assertEqual(code, 2)
-        self.assertIn("region 'paris' has no catalog heading", output)
-        self.assertFalse(os.path.exists(os.path.join(self.root, "docs", "cords.md")))
+        self.assertEqual(code, 0, output)
+        self.assertIn('Related CORDs: <a href="#a-london_central_a">a-london_central_a.jsonl</a>'
+                      "</p>", self.catalog_page())
+        self.assertIn('Related CORDs: <a href="#a-london">a-london.jsonl</a></p>',
+                      self.catalog_page())
+
+    def test_catalog_escapes_cords_json_text(self):
+        self.write_cords({"a-london.jsonl": cord(
+            "a-london.jsonl", synopsis="<script>alert(1)</script> & co",
+            primary_source={"name": "<b>S</b>", "url": 'https://x.test/?a="1"&b=2'},
+            license="<i>L</i>", data_source="<D>",
+            sample_record={"NAME": "<img src=x onerror=alert(1)>"})})
+        code, output = self.release("catalog")
+        self.assertEqual(code, 0, output)
+        page = self.catalog_page()
+        for raw in ("<script>", "<b>S</b>", "<i>L</i>", "<D>", "<img"):
+            self.assertNotIn(raw, page)
+        for escaped in ("&lt;script&gt;alert(1)&lt;/script&gt; &amp; co",
+                        'href="https://x.test/?a=&quot;1&quot;&amp;b=2"',
+                        "&lt;b&gt;S&lt;/b&gt;", "&lt;i&gt;L&lt;/i&gt;", "&lt;D&gt;",
+                        "&lt;img src=x onerror=alert(1)&gt;"):
+            self.assertIn(escaped, page)
+
+    def assertCatalogStops(self, message):
+        code, output = self.release("catalog")
+        self.assertEqual(code, 2, output)
+        self.assertIn(message, output)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "docs")))
+
+    def test_catalog_stops_on_a_released_file_without_a_cords_entry(self):
+        self.write_cords({"b-london.jsonl": cord("b-london.jsonl")})
+        self.assertCatalogStops("a-london.jsonl: no entry in development/cords.json")
+
+    def test_catalog_stops_on_a_released_file_without_a_stats_row(self):
+        self.write("development/CORD_stats.csv", STATS_CSV.splitlines()[0] + "\n")
+        self.assertCatalogStops("a-london.jsonl: no row with SOURCE a and GEO london in "
+                                "development/CORD_stats.csv")
+
+    def test_catalog_stops_on_a_cords_entry_without_a_manifest_entry(self):
+        self.write_cords({**self.cords(), "z-moscow.jsonl": cord("z-moscow.jsonl")})
+        self.assertCatalogStops("development/cords.json: no manifest.json entry for "
+                                "z-moscow.jsonl")
+
+    def test_catalog_stops_on_a_tag_without_a_changelog_heading(self):
+        self.write("CHANGELOG.md", publish_cord.upload.CHANGELOG_HEADER + "\n## [Unreleased]\n")
+        self.assertCatalogStops("a-london.jsonl: tag v0.1.0 has no '## [v0.1.0] - <date>' "
+                                "heading in CHANGELOG.md")
+
+    def test_catalog_command_stops_on_unmapped_region_even_when_unreleased(self):
+        self.write_manifest([self.entry("a-london.jsonl", FILE_A, "v0.1.0"),
+                             self.entry("c-paris.jsonl", FILE_B, None)])
+        self.assertCatalogStops(publish_cord.upload.region_error("c-paris.jsonl"))
 
     # --- status ---
 
@@ -514,6 +610,16 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("status")
         self.assertEqual(code, 2)
         self.assertIn("nothing to release", output)
+
+    def test_status_blocks_a_pending_file_without_a_cords_entry(self):
+        self.write_cords({"a-london.jsonl": cord("a-london.jsonl")})
+        code, output = self.release("status")
+        self.assertEqual(code, 2)
+        self.assertIn("blocking: b-london.jsonl: no entry in development/cords.json", output)
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 2)
+        self.assertIn("b-london.jsonl: no entry in development/cords.json", output)
+        self.assertNoVersionDraft()
 
     def test_status_names_files_missing_from_the_staging_draft(self):
         os.remove(os.path.join(self.gh_state, "assets", STAGING, "b-london.jsonl"))
@@ -571,7 +677,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("[0.2.0]: https://github.com/Owner/Repo/compare/v0.1.0...0.2.0", changelog)
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
         create = next(c for c in self.calls() if c[:2] == ["pr", "create"])
-        self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `docs/cords.md`, "
+        self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `development/cords.json`, "
+                      "`docs/index.html`, `docs/cords.html`, `docs/cords.md`, "
                       "`development/CORD_stats.xlsx` and `development/CORD_stats.csv`.",
                       create[create.index("--body") + 1])
 
@@ -640,17 +747,32 @@ class ReleaseTest(unittest.TestCase):
         changed = self.git("diff", "--name-only", "main", "release-0.2.0").split()
         self.assertEqual(sorted(changed),
                          ["CHANGELOG.md", "development/CORD_stats.csv",
-                          "development/CORD_stats.xlsx", "docs/cords.md", "manifest.json"])
+                          "development/CORD_stats.xlsx", "development/cords.json",
+                          "docs/cords.html", "docs/cords.md", "docs/index.html",
+                          "manifest.json"])
 
     def test_prepare_writes_the_catalog(self):
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 0, output)
-        catalog = self.origin_file("release-0.2.0", "docs/cords.md")
-        manifest = json.loads(self.origin_file("release-0.2.0", "manifest.json"))
-        self.assertEqual(catalog, publish_cord.cords_catalog(manifest["files"]))
+        for name, text in publish_cord.catalog_pages(self.root).items():
+            self.assertEqual(self.origin_file("release-0.2.0", name), text)
+        catalog = self.origin_file("release-0.2.0", "docs/cords.html")
         base = "https://github.com/Owner/Repo/releases/download"
-        self.assertIn(f"| [a-london.jsonl]({base}/v0.1.0/a-london.jsonl) | v0.1.0 |", catalog)
-        self.assertIn(f"| [b-london.jsonl]({base}/0.2.0/b-london.jsonl) | 0.2.0 |", catalog)
+        self.assertIn(f"curl -fsSLO {base}/v0.1.0/a-london.jsonl\n", catalog)
+        self.assertIn(f"curl -fsSLO {base}/0.2.0/b-london.jsonl\n", catalog)
+        self.assertIn(f"0.2.0, released {TODAY}", catalog)
+        self.assertIn('Related CORDs: <a href="#a-london">a-london.jsonl</a>', catalog)
+
+    def test_prepare_commits_an_uncommitted_cords_entry(self):
+        # setUp leaves the cords.json entry for b-london.jsonl uncommitted.
+        self.assertIn("development/cords.json", self.git("status", "--porcelain"))
+        code, output = self.release("prepare", "--bump", "minor")
+        self.assertEqual(code, 0, output)
+        cords = json.loads(self.origin_file("release-0.2.0", "development/cords.json"))
+        self.assertEqual(cords["b-london.jsonl"], cord("b-london.jsonl"))
+        self.assertIn("Synopsis of b-london.jsonl.",
+                      self.origin_file("release-0.2.0", "docs/cords.html"))
+        self.assertEqual(self.git("status", "--porcelain"), "")
 
     def test_prepare_updates_stats_for_added_and_changed_files(self):
         # a-london.jsonl changed (tag null, listed under Changed); b-london.jsonl is new.
@@ -664,7 +786,9 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("prepare", "--bump", "minor")
         self.assertEqual(code, 0, output)
         self.assertEqual(self.origin_file("release-0.2.0", "development/CORD_stats.csv"),
-                         "lines,3\n")
+                         STATS_CSV.splitlines()[0] + "\n"
+                         + f"{TODAY},Changed in 0.2.0,a,london,1,0,1,1,,0\n"
+                         + f"{TODAY},Added in 0.2.0,b,london,2,0,2,2,,0\n")
         self.assertEqual(self.origin_file("release-0.2.0", "development/CORD_stats.xlsx"), (
             "stats\n"
             f"--stats CORD_stats.xlsx --reason Added in 0.2.0 --date {TODAY} b-london.jsonl\n"
