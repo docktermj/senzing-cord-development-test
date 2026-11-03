@@ -137,7 +137,7 @@ answer: the SemVer bump, and whether to merge.
 - **`development/cords.json`:** hand-edited, keyed by file name: `synopsis`, `primary_source`
   (`name` and `url`), `license`, `snapshot_date`, `data_source` and `sample_record`. A file
   can't be released without an entry.
-- **`README.md`:** not changed; its `## CORDs` section links to the catalog.
+- **`README.md`:** not changed; it links to the catalog on GitHub Pages.
 - **`development/CORD_stats.xlsx`:** `bin/get_cord_stats.py` rewrites the row of each new and changed
   file, matched on `SOURCE` and `GEO`. It sets the counts (a feature no longer present becomes
   0), `LAST_UPDATED` (the release date) and `UPDATE_REASON` (`Added in <version>` or
