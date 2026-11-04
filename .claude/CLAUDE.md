@@ -17,12 +17,14 @@ base URL, and `PAGES_URL`, the GitHub Pages base URL
 ## Repository layout
 
 - `development/`: Markdown for developers and the data behind the catalog.
-  `publishing-approach.md`, `publishing-cords.md` and `submit-without-write-access.md`;
+  `publishing-approach.md`, `publishing-cords.md`, `submit-without-write-access.md` and
+  `bulk-download.md`;
   `cords.json`, the hand-edited synopsis, primary source, license, snapshot date,
   `DATA_SOURCE` code and sample record of each file; and `CORD_stats.xlsx` with its copy
   `CORD_stats.csv`.
 - `docs/`: only what GitHub Pages serves from `main:/docs`, at the `PAGES_URL` above: the
-  generated `index.html`, `cords.html` and `cords.md` stub, and `.nojekyll`.
+  generated `index.html`, `cords.html`, `cords.md` stub, `SHA256SUMS` and `urls.txt`, and
+  `.nojekyll`.
 - `.claude/skills/`: the `/upload-senzing-ready`, `/publish-cord` and `/download-senzing-ready`
   skills and their tests.
 - `bin/`: `get_cord_stats.py`, which computes the stats rows, and its tests.
@@ -71,7 +73,7 @@ nothing. `/publish-cord` (`.claude/skills/publish-cord/`) publishes them:
 - it asks for the SemVer bump;
 - its `status` step stops on a file being released that has no `development/cords.json` entry;
 - it renames the `unreleased` draft to `<version>`, and opens a `release-<version>` PR that
-  also regenerates `docs/index.html` and `docs/cords.html`, commits `development/cords.json`,
+  also regenerates the catalog files in `docs/`, commits `development/cords.json`,
   and rewrites the files' rows in `development/CORD_stats.xlsx` (through
   `bin/get_cord_stats.py`, which also rewrites `development/CORD_stats.csv` from it); it never
   changes `README.md`, which links to the catalog on GitHub Pages;
@@ -84,7 +86,9 @@ offline (no network, `gh` or `senzing-ready/`):
 - inputs: `manifest.json`, `development/cords.json`, `REGIONS`, `development/CORD_stats.csv`
   and `CHANGELOG.md`;
 - outputs: `docs/index.html` (the landing page), `docs/cords.html` (the catalog, one section
-  per region) and the `docs/cords.md` stub that links to it;
+  per region), the `docs/cords.md` stub that links to it, and `docs/SHA256SUMS` and
+  `docs/urls.txt`, the released files' checksums and URLs for bulk downloads
+  (`development/bulk-download.md`);
 - it stops when a released file has no `cords.json` entry or no stats row, when a
   `cords.json` entry has no manifest entry, when a released file's tag has no
   `## [<tag>] - <date>` heading in `CHANGELOG.md`, or on a region missing from `REGIONS`;

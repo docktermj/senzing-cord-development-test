@@ -12,7 +12,7 @@ The publish-cord skill runs the subcommands in order, asking the user between th
   publish           merge the PR, publish the draft, verify downloads
 
 Outside that sequence, "catalog" rewrites the GitHub Pages files docs/index.html,
-docs/cords.html and docs/cords.md from manifest.json, development/cords.json,
+docs/cords.html, docs/cords.md, docs/SHA256SUMS and docs/urls.txt from manifest.json, development/cords.json,
 development/CORD_stats.csv and CHANGELOG.md, offline.
 
 Every step can be rerun. A draft Release above the latest version is resumed.
@@ -50,8 +50,11 @@ UNCOMMITTED_FILES = {"manifest.json", "CHANGELOG.md", CORDS_FILE}
 INDEX_FILE = os.path.join("docs", "index.html")
 CATALOG_HTML = os.path.join("docs", "cords.html")
 CATALOG_FILE = os.path.join("docs", "cords.md")
+# Plain-text lists of the released files, for bulk downloads (development/bulk-download.md).
+SUMS_FILE = os.path.join("docs", "SHA256SUMS")
+URLS_FILE = os.path.join("docs", "urls.txt")
 # The Pages files "catalog" writes, in the order it reports them.
-PAGES = (INDEX_FILE, CATALOG_HTML, CATALOG_FILE)
+PAGES = (INDEX_FILE, CATALOG_HTML, CATALOG_FILE, SUMS_FILE, URLS_FILE)
 STATS_FILE = os.path.join("development", "CORD_stats.xlsx")
 # Written by bin/get_cord_stats.py next to STATS_FILE every time it saves the workbook.
 STATS_CSV = os.path.join("development", "CORD_stats.csv")
@@ -504,13 +507,22 @@ def cords_html(entries):
                      "commands.", hero, sections)
 
 
+def bulk_lists(files):
+    """(SHA256SUMS, urls.txt) text for the released files, sorted by name."""
+    released = sorted((f for f in files if f.get("url")), key=lambda f: f["name"])
+    sums = "".join(f"{f['sha256']}  {f['name']}\n" for f in released)
+    urls = "".join(f"{f['url']}\n" for f in released)
+    return sums, urls
+
+
 def catalog_pages(root):
     """{path: text} of every Pages file, in PAGES order. Offline: no network or gh."""
     manifest = upload.load_manifest(os.path.join(root, "manifest.json"))
     entries = catalog_entries(manifest["files"], read_cords(root), read_stats(root),
                               release_dates(read_changelog(root)))
+    sums, urls = bulk_lists(manifest["files"])
     return {INDEX_FILE: index_html(entries), CATALOG_HTML: cords_html(entries),
-            CATALOG_FILE: CATALOG_STUB}
+            CATALOG_FILE: CATALOG_STUB, SUMS_FILE: sums, URLS_FILE: urls}
 
 
 def write_pages(root):
