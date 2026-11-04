@@ -468,11 +468,13 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("catalog")
         self.assertEqual(code, 0, output)
         self.assertEqual(output, "updated: docs/index.html\nupdated: docs/cords.html\n"
-                                 "updated: docs/cords.md\n")
+                                 "updated: docs/cords.md\nupdated: docs/SHA256SUMS\n"
+                                 "updated: docs/urls.txt\n")
         pages = publish_cord.catalog_pages(self.root)
         for name, text in pages.items():
             self.assertEqual(read(os.path.join(self.root, name)), text)
-            self.assertTrue(text.startswith(publish_cord.CATALOG_COMMENT + "\n"))
+            if name not in (publish_cord.SUMS_FILE, publish_cord.URLS_FILE):
+                self.assertTrue(text.startswith(publish_cord.CATALOG_COMMENT + "\n"))
         self.assertIn(publish_cord.CATALOG_COMMAND, publish_cord.CATALOG_COMMENT)
         self.assertIn("<https://hub.dockter.com/senzing-cord-development-test/cords.html>",
                       self.catalog_page("cords.md"))
@@ -480,7 +482,8 @@ class ReleaseTest(unittest.TestCase):
         code, output = self.release("catalog")
         self.assertEqual(code, 0, output)
         self.assertEqual(output, "unchanged: docs/index.html\nunchanged: docs/cords.html\n"
-                                 "unchanged: docs/cords.md\n")
+                                 "unchanged: docs/cords.md\nunchanged: docs/SHA256SUMS\n"
+                                 "unchanged: docs/urls.txt\n")
         self.assertEqual(before, {name: os.stat(os.path.join(self.root, name)).st_mtime_ns
                                   for name in pages})
         self.assertEqual(self.calls(), [])  # no gh
@@ -520,8 +523,22 @@ class ReleaseTest(unittest.TestCase):
     def test_catalog_leaves_out_unreleased_files(self):
         # b-london.jsonl is staged with tag null, and already has a cords.json entry.
         self.release("catalog")
-        for name in ("index.html", "cords.html"):
+        for name in ("index.html", "cords.html", "SHA256SUMS", "urls.txt"):
             self.assertNotIn("b-london", self.catalog_page(name))
+
+    def test_catalog_lists_released_files_for_bulk_download(self):
+        self.release("catalog")
+        url = "https://github.com/Owner/Repo/releases/download/v0.1.0/a-london.jsonl"
+        self.assertEqual(self.catalog_page("SHA256SUMS"), f"{sha(FILE_A)}  a-london.jsonl\n")
+        self.assertEqual(self.catalog_page("urls.txt"), f"{url}\n")
+
+    def test_bulk_lists_sort_by_name_and_skip_unreleased(self):
+        files = [{"name": "z.jsonl", "sha256": "2", "url": "u/z"},
+                 {"name": "m.jsonl", "sha256": "9", "url": None},
+                 {"name": "a.jsonl", "sha256": "1", "url": "u/a"}]
+        self.assertEqual(publish_cord.bulk_lists(files),
+                         ("1  a.jsonl\n2  z.jsonl\n", "u/a\nu/z\n"))
+        self.assertEqual(publish_cord.bulk_lists([]), ("", ""))
 
     def test_catalog_says_not_stated_for_nulls(self):
         self.write_cords({"a-london.jsonl": cord(
@@ -678,8 +695,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("pull request: https://github.com/Owner/Repo/pull/1", output)
         create = next(c for c in self.calls() if c[:2] == ["pr", "create"])
         self.assertIn("updates `manifest.json`, `CHANGELOG.md`, `development/cords.json`, "
-                      "`docs/index.html`, `docs/cords.html`, `docs/cords.md`, "
-                      "`development/CORD_stats.xlsx` and `development/CORD_stats.csv`.",
+                      "`docs/index.html`, `docs/cords.html`, `docs/cords.md`, `docs/SHA256SUMS`, "
+                      "`docs/urls.txt`, `development/CORD_stats.xlsx` and `development/CORD_stats.csv`.",
                       create[create.index("--body") + 1])
 
     def test_prepare_requires_bump(self):
@@ -748,8 +765,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(sorted(changed),
                          ["CHANGELOG.md", "development/CORD_stats.csv",
                           "development/CORD_stats.xlsx", "development/cords.json",
-                          "docs/cords.html", "docs/cords.md", "docs/index.html",
-                          "manifest.json"])
+                          "docs/SHA256SUMS", "docs/cords.html", "docs/cords.md",
+                          "docs/index.html", "docs/urls.txt", "manifest.json"])
 
     def test_prepare_writes_the_catalog(self):
         code, output = self.release("prepare", "--bump", "minor")

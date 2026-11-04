@@ -1,0 +1,9 @@
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/gleif-london.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.1/ofac-london.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.9/ofac-moscow.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.2/opendata-lasvegas.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.4/opendata2-lasvegas.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.6/opendata3-lasvegas.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.7/opendata4-lasvegas.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.8/profound-lasvegas.jsonl
+https://github.com/docktermj/senzing-cord-development-test/releases/download/0.1.5/us_labor_violations-lasvegas.jsonl
